@@ -1,13 +1,21 @@
 \# YOLO11 API
 
-
+![Python](https://img.shields.io/badge/Python-3.12-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-REST%20API-green)
+![Docker](https://img.shields.io/badge/Docker-ready-blue)
+![CI](https://img.shields.io/badge/CI-passing-brightgreen)
+![License](https://img.shields.io/badge/License-MIT-yellow)
 
 API REST em \*\*FastAPI\*\* para carregamento, gerenciamento e inferência com modelos YOLO11, seguindo arquitetura limpa em camadas, validação de uploads, persistência interna de resultados e proteção de rotas sensíveis por API Key.
 
 
 
-\---
+\## Demo rápida com Docker Compose
 
+Subir a API:
+
+```powershell
+docker compose up -d --build
 
 
 \## Status do projeto
