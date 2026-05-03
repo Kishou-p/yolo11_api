@@ -1,0 +1,38 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+.venv
+.venv/
+venv
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Runtime artifacts
+data/uploads/*
+data/outputs/*
+annotated_*.png
+
+# Keep folder structure
+!data/uploads/.gitkeep
+!data/outputs/.gitkeep
+
+# Logs
+*.log
