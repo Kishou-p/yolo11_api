@@ -8,7 +8,7 @@
 
 API REST em **FastAPI** para carregamento, gerenciamento e inferência com modelos YOLO11.
 
-O projeto foi desenvolvido com foco em arquitetura limpa, separação de responsabilidades, testes automatizados, segurança básica com API Key, persistência de resultados e execução com Docker.
+O projeto foi desenvolvido com foco em arquitetura limpa, separação de responsabilidades, testes automatizados, proteção por API Key, persistência de resultados e execução com Docker.
 
 ---
 
@@ -74,7 +74,7 @@ data/
 tests/             # Testes automatizados
 ```
 
-Regra importante do projeto:
+Regra principal do projeto:
 
 ```text
 ultralytics só deve ser importado em app/services/yolo_service.py
