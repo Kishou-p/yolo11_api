@@ -415,8 +415,13 @@ Principais pontos de atenção:
 Próximos passos planejados:
 
 1. Consolidar documentação e repositório.
-2. Adicionar endpoint para listar resultados.
-3. Adicionar endpoint para deletar resultados.
+2. Melhorar logs com execution_id.
+3. Adicionar endpoint de status do storage.
+4. Otimizar tamanho da imagem Docker.
+5. Criar interface web para upload e visualização.
+6. Criar fluxo de feedback para dataset.
+7. Evoluir para detecção de anomalias.
+8. Automatizar coleta e organização de imagens.
 4. Melhorar logs com `execution_id`.
 5. Adicionar endpoint de status do storage.
 6. Otimizar tamanho da imagem Docker.
