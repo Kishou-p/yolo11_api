@@ -35,7 +35,7 @@ def _register_middlewares(app: FastAPI, settings: Settings) -> None:
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["X-API-Key", "Content-Type"],
     )
 
