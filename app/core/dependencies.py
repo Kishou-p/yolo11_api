@@ -78,9 +78,13 @@ def get_inference_service(
 
 
 def get_result_service(
+    settings: Annotated[Settings, Depends(get_settings)],
     storage_service: Annotated[
         StorageService,
         Depends(get_storage_service),
     ],
 ) -> ResultService:
-    return ResultService(storage_service=storage_service)
+    return ResultService(
+        storage_service=storage_service,
+        api_prefix=settings.api_prefix,
+    )

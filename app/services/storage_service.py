@@ -58,6 +58,20 @@ class StorageService:
     def build_annotated_path(self, execution_id: str) -> Path:
         return self._output_dir / f"{execution_id}_annotated.png"
 
+    def list_result_paths(self) -> list[Path]:
+        return sorted(
+            self._output_dir.glob("*.json"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+
+    def delete_file_if_exists(self, file_path: Path) -> bool:
+        if not file_path.exists():
+            return False
+
+        file_path.unlink()
+        return True
+
     def save_inference_result(
         self,
         execution_id: str,
