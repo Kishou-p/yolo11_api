@@ -59,7 +59,7 @@ def test_protected_route_accepts_valid_api_key(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json() == {
-        "model_path": str(model_path),
+        "model_name": model_path.name,
         "exists": False,
         "loaded": False,
     }

@@ -113,7 +113,7 @@ def test_get_result_data_rejects_invalid_execution_id(
         result_service.get_result_data("../../danger")
 
     assert exc_info.value.status_code == 400
-    assert exc_info.value.message == "Invalid execution_id: ../../danger"
+    assert exc_info.value.message == "Invalid execution_id."
 
 
 def test_get_annotated_image_path_rejects_invalid_execution_id(
@@ -126,7 +126,7 @@ def test_get_annotated_image_path_rejects_invalid_execution_id(
         result_service.get_annotated_image_path("abc123")
 
     assert exc_info.value.status_code == 400
-    assert exc_info.value.message == "Invalid execution_id: abc123"
+    assert exc_info.value.message == "Invalid execution_id."
 
 
 def _build_storage_service(tmp_path: Path) -> StorageService:
@@ -232,7 +232,7 @@ def test_delete_result_removes_result_image_and_upload(
     annotated_path = storage_service.build_annotated_path(execution_id)
     upload_path = storage_service.build_upload_path(
         execution_id=execution_id,
-        original_filename="test.jpg",
+        content_type="image/jpeg",
     )
 
     result_path.write_text(
@@ -280,4 +280,4 @@ def test_delete_result_rejects_invalid_execution_id(
         result_service.delete_result("invalid-id")
 
     assert exc_info.value.status_code == 400
-    assert exc_info.value.message == "Invalid execution_id: invalid-id"
+    assert exc_info.value.message == "Invalid execution_id."

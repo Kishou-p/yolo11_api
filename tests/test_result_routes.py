@@ -99,7 +99,7 @@ def test_get_inference_result_rejects_invalid_execution_id(
 
     assert response.status_code == 400
     assert response.json() == {
-        "detail": "Invalid execution_id: invalid-id",
+        "detail": "Invalid execution_id.",
     }
 
 
@@ -115,7 +115,7 @@ def test_get_annotated_image_rejects_invalid_execution_id(
 
     assert response.status_code == 400
     assert response.json() == {
-        "detail": "Invalid execution_id: abc123",
+        "detail": "Invalid execution_id.",
     }
 
 
@@ -269,7 +269,7 @@ def test_delete_result_rejects_invalid_execution_id(
 
     assert response.status_code == 400
     assert response.json() == {
-        "detail": "Invalid execution_id: invalid-id",
+        "detail": "Invalid execution_id.",
     }
 
 

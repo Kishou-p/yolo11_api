@@ -72,18 +72,14 @@ class ResultService:
         if not result_path.exists():
             raise ResultNotFoundError(execution_id)
 
-        filename = self._get_filename_from_result(result_path)
-
         self._storage_service.delete_file_if_exists(result_path)
         self._storage_service.delete_file_if_exists(
             self._storage_service.build_annotated_path(execution_id)
         )
 
-        if filename:
-            upload_path = self._storage_service.build_upload_path(
-                execution_id=execution_id,
-                original_filename=filename,
-            )
+        for upload_path in self._storage_service.find_upload_paths(
+            execution_id,
+        ):
             self._storage_service.delete_file_if_exists(upload_path)
 
         return ResultDeleteResponse(
@@ -112,14 +108,6 @@ class ResultService:
                 "detections_count",
             ),
         )
-
-    def _get_filename_from_result(self, result_path: Path) -> str | None:
-        try:
-            result_data = self._read_json_file(result_path)
-        except ResultNotFoundError:
-            return None
-
-        return self._get_optional_str(result_data, "filename")
 
     def _get_public_result_url(
         self,

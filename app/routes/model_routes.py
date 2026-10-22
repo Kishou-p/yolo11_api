@@ -21,7 +21,7 @@ def get_model_status(
     ],
 ) -> ModelStatusResponse:
     return ModelStatusResponse(
-        model_path=str(model_registry.model_path),
+        model_name=model_registry.model_path.name,
         exists=model_registry.model_exists(),
         loaded=model_registry.is_loaded(),
     )
@@ -41,7 +41,7 @@ def load_model(
     model_registry.load_model()
 
     return ModelLoadResponse(
-        model_path=str(model_registry.model_path),
+        model_name=model_registry.model_path.name,
         loaded=model_registry.is_loaded(),
         message="YOLO model loaded successfully.",
     )

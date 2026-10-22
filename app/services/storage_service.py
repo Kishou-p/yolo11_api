@@ -7,11 +7,10 @@ from numpy.typing import NDArray
 from app.utils.file_utils import (
     build_execution_id,
     ensure_directory_exists,
-    sanitize_filename,
     save_bytes_to_file,
     save_json_to_file,
 )
-from app.utils.image_utils import save_image_to_file
+from app.utils.image_utils import get_image_extension, save_image_to_file
 
 
 class StorageService:
@@ -32,12 +31,12 @@ class StorageService:
     def save_upload(
         self,
         execution_id: str,
-        original_filename: str,
+        content_type: str | None,
         image_bytes: bytes,
     ) -> Path:
         upload_path = self.build_upload_path(
             execution_id=execution_id,
-            original_filename=original_filename,
+            content_type=content_type,
         )
 
         return save_bytes_to_file(upload_path, image_bytes)
@@ -45,12 +44,14 @@ class StorageService:
     def build_upload_path(
         self,
         execution_id: str,
-        original_filename: str,
+        content_type: str | None,
     ) -> Path:
-        safe_filename = sanitize_filename(original_filename)
-        extension = Path(safe_filename).suffix or ".bin"
+        extension = get_image_extension(content_type)
 
         return self._upload_dir / f"{execution_id}{extension}"
+
+    def find_upload_paths(self, execution_id: str) -> list[Path]:
+        return list(self._upload_dir.glob(f"{execution_id}.*"))
 
     def build_result_path(self, execution_id: str) -> Path:
         return self._output_dir / f"{execution_id}.json"

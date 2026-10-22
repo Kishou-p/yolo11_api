@@ -27,27 +27,27 @@ def test_create_execution_id_returns_hex_string(tmp_path: Path) -> None:
     assert execution_id.isalnum()
 
 
-def test_build_upload_path_uses_execution_id_and_extension(
+def test_build_upload_path_uses_extension_from_content_type(
     tmp_path: Path,
 ) -> None:
     storage_service = _build_storage_service(tmp_path)
 
     upload_path = storage_service.build_upload_path(
         execution_id="abc123",
-        original_filename="image.png",
+        content_type="image/png",
     )
 
     assert upload_path == tmp_path / "uploads" / "abc123.png"
 
 
-def test_build_upload_path_uses_bin_when_no_extension(
+def test_build_upload_path_uses_bin_for_unknown_content_type(
     tmp_path: Path,
 ) -> None:
     storage_service = _build_storage_service(tmp_path)
 
     upload_path = storage_service.build_upload_path(
         execution_id="abc123",
-        original_filename="image",
+        content_type="application/x-php",
     )
 
     assert upload_path == tmp_path / "uploads" / "abc123.bin"
@@ -58,7 +58,7 @@ def test_save_upload_writes_file(tmp_path: Path) -> None:
 
     saved_path = storage_service.save_upload(
         execution_id="abc123",
-        original_filename="image.jpg",
+        content_type="image/jpeg",
         image_bytes=b"fake-image",
     )
 

@@ -40,7 +40,7 @@ def test_load_model_raises_when_model_file_does_not_exist(
         service.load_model()
 
     assert exc_info.value.status_code == 404
-    assert exc_info.value.message == f"Model file not found: {model_path}"
+    assert exc_info.value.message == "Model file not found."
 
 
 def test_load_model_calls_yolo_when_file_exists(

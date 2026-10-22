@@ -24,7 +24,7 @@ def test_model_status_returns_false_when_model_file_does_not_exist(
 
     assert response.status_code == 200
     assert response.json() == {
-        "model_path": str(missing_model_path),
+        "model_name": missing_model_path.name,
         "exists": False,
         "loaded": False,
     }
@@ -43,7 +43,7 @@ def test_load_model_returns_404_when_model_file_does_not_exist(
 
     assert response.status_code == 404
     assert response.json() == {
-        "detail": f"Model file not found: {missing_model_path}",
+        "detail": "Model file not found.",
     }
 
 
@@ -63,7 +63,7 @@ def test_load_model_returns_success_when_service_loads_model(
 
     assert response.status_code == 200
     assert response.json() == {
-        "model_path": str(model_path),
+        "model_name": model_path.name,
         "loaded": True,
         "message": "YOLO model loaded successfully.",
     }

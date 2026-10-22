@@ -1,10 +1,11 @@
-from app.services.result_service import ResultService
-
+import hmac
 from typing import Annotated, cast
+
 from fastapi import Depends, Header, Request
 from app.core.config import Settings
 from app.services.health_service import HealthService
 from app.services.inference_service import InferenceService
+from app.services.result_service import ResultService
 from app.services.model_registry_service import ModelRegistryService
 from app.services.storage_service import StorageService
 from app.services.yolo_service import YoloService
@@ -18,8 +19,22 @@ def validate_api_key(
     settings: Annotated[Settings, Depends(get_settings)],
     x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
 ) -> None:
-    if x_api_key != settings.api_key:
+    if not x_api_key or not _matches_any_api_key(
+        x_api_key,
+        settings.valid_api_keys(),
+    ):
         raise UnauthorizedApiKeyError()
+
+
+def _matches_any_api_key(candidate: str, valid_keys: list[str]) -> bool:
+    candidate_bytes = candidate.encode("utf-8")
+    matched = False
+
+    for valid_key in valid_keys:
+        if hmac.compare_digest(candidate_bytes, valid_key.encode("utf-8")):
+            matched = True
+
+    return matched
 
 
 def get_health_service(
@@ -73,6 +88,7 @@ def get_inference_service(
         model_registry=model_registry,
         storage_service=storage_service,
         max_image_size_mb=settings.max_image_size_mb,
+        max_image_pixels=settings.max_image_pixels,
         api_prefix=settings.api_prefix,
     )
 

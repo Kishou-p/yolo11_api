@@ -5,9 +5,12 @@ from app.utils.annotation_utils import draw_detections_on_image
 from app.utils.image_utils import (
     decode_image_bytes,
     validate_image_content_type,
+    validate_image_dimensions,
     validate_image_signature,
     validate_image_size,
 )
+
+MAX_FILENAME_LENGTH = 255
 
 
 class InferenceService:
@@ -17,10 +20,12 @@ class InferenceService:
         storage_service: StorageService,
         max_image_size_mb: int,
         api_prefix: str,
+        max_image_pixels: int = 40_000_000,
     ) -> None:
         self._model_registry = model_registry
         self._storage_service = storage_service
         self._max_image_size_mb = max_image_size_mb
+        self._max_image_pixels = max_image_pixels
         self._api_prefix = api_prefix
 
     def run_image_inference(
@@ -32,13 +37,15 @@ class InferenceService:
         validate_image_content_type(content_type)
         validate_image_size(image_bytes, self._max_image_size_mb)
         validate_image_signature(content_type, image_bytes)
+        validate_image_dimensions(image_bytes, self._max_image_pixels)
 
+        filename = filename[:MAX_FILENAME_LENGTH]
         image = decode_image_bytes(image_bytes)
         execution_id = self._storage_service.create_execution_id()
 
         self._storage_service.save_upload(
             execution_id=execution_id,
-            original_filename=filename,
+            content_type=content_type,
             image_bytes=image_bytes,
         )
 
