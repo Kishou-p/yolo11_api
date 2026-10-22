@@ -32,6 +32,15 @@ class ModelLoadError(AppError):
         )
 
 
+class ModelChecksumMismatchError(AppError):
+    def __init__(self, model_path: Path) -> None:
+        super().__init__(
+            message="Model file failed integrity check.",
+            status_code=500,
+            log_detail=f"Model checksum mismatch: {model_path}",
+        )
+
+
 class ModelNotLoadedError(AppError):
     def __init__(self, model_path: Path) -> None:
         super().__init__(

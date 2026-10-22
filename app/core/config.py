@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
 
     yolo_model_path: Path = Path("data/models/yolo11n.pt")
+    yolo_model_sha256: str | None = None
     load_model_on_startup: bool = True
     max_image_size_mb: int = 10
     max_image_pixels: int = 40_000_000
