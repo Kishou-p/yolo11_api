@@ -19,11 +19,13 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
 
     yolo_model_path: Path = Path("data/models/yolo11n.pt")
+    load_model_on_startup: bool = True
     max_image_size_mb: int = 10
     max_image_pixels: int = 40_000_000
 
     upload_dir: Path = Path("data/uploads")
     output_dir: Path = Path("data/outputs")
+    min_free_disk_mb: int = 500
 
     api_key: SecretStr = SecretStr("dev-secret-key")
     extra_api_keys: list[SecretStr] = []

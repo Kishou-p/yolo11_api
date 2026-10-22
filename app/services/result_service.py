@@ -21,10 +21,15 @@ class ResultService:
         self._storage_service = storage_service
         self._api_prefix = api_prefix
 
-    def list_results(self) -> ResultListResponse:
+    def list_results(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> ResultListResponse:
         results: list[ResultSummaryResponse] = []
+        result_paths = self._storage_service.list_result_paths()
 
-        for result_path in self._storage_service.list_result_paths():
+        for result_path in result_paths[offset : offset + limit]:
             try:
                 result_data = self._read_json_file(result_path)
             except ResultNotFoundError:
@@ -39,6 +44,9 @@ class ResultService:
 
         return ResultListResponse(
             count=len(results),
+            total=len(result_paths),
+            limit=limit,
+            offset=offset,
             results=results,
         )
 
@@ -72,7 +80,6 @@ class ResultService:
         if not result_path.exists():
             raise ResultNotFoundError(execution_id)
 
-        self._storage_service.delete_file_if_exists(result_path)
         self._storage_service.delete_file_if_exists(
             self._storage_service.build_annotated_path(execution_id)
         )
@@ -81,6 +88,9 @@ class ResultService:
             execution_id,
         ):
             self._storage_service.delete_file_if_exists(upload_path)
+
+        # The JSON goes last so a failed delete can be retried.
+        self._storage_service.delete_file_if_exists(result_path)
 
         return ResultDeleteResponse(
             execution_id=execution_id,

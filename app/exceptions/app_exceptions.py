@@ -90,6 +90,14 @@ class StorageWriteError(AppError):
             log_detail=f"Failed to write file: {target_path}",
         )
 
+class StorageDeleteError(AppError):
+    def __init__(self, target_path: Path) -> None:
+        super().__init__(
+            message="Failed to delete file.",
+            status_code=500,
+            log_detail=f"Failed to delete file: {target_path}",
+        )
+
 class ResultNotFoundError(AppError):
     def __init__(self, execution_id: str) -> None:
         message = f"Inference result not found: {execution_id}"

@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -38,24 +39,27 @@ def sanitize_filename(filename: str) -> str:
 
 
 def save_bytes_to_file(file_path: Path, content: bytes) -> Path:
+    """Write to a temporary file and rename it, so a crash mid-write
+    never leaves a truncated file at file_path."""
+    temp_path = file_path.with_name(f".{file_path.name}.{uuid4().hex}.tmp")
+
     try:
-        file_path.write_bytes(content)
+        with temp_path.open("wb") as temp_file:
+            temp_file.write(content)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_path, file_path)
     except OSError as exc:
+        temp_path.unlink(missing_ok=True)
         raise StorageWriteError(file_path) from exc
 
     return file_path
 
 
 def save_json_to_file(file_path: Path, content: dict[str, Any]) -> Path:
-    try:
-        file_path.write_text(
-            json.dumps(content, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-    except OSError as exc:
-        raise StorageWriteError(file_path) from exc
+    serialized = json.dumps(content, ensure_ascii=False, indent=2)
 
-    return file_path
+    return save_bytes_to_file(file_path, serialized.encode("utf-8"))
 
 def build_execution_id() -> str:
     return uuid4().hex

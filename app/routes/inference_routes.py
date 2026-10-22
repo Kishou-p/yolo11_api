@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import Settings
 from app.core.dependencies import (
@@ -34,7 +35,9 @@ async def run_image_inference(
     if len(image_bytes) > max_size_bytes:
         raise ImageTooLargeError(settings.max_image_size_mb)
 
-    return inference_service.run_image_inference(
+    # Decoding, YOLO and disk writes are blocking: keep them off the event loop.
+    return await run_in_threadpool(
+        inference_service.run_image_inference,
         filename=file.filename or "uploaded_image",
         content_type=file.content_type,
         image_bytes=image_bytes,

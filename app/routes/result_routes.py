@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 
 from app.core.dependencies import get_result_service, validate_api_key
@@ -17,8 +17,10 @@ router = APIRouter(
 @router.get("", response_model=ResultListResponse)
 def list_results(
     result_service: Annotated[ResultService, Depends(get_result_service)],
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ResultListResponse:
-    return result_service.list_results()
+    return result_service.list_results(limit=limit, offset=offset)
 
 
 @router.get("/{execution_id}")

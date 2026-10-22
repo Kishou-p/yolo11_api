@@ -1,13 +1,24 @@
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import Settings
 from app.core.logging_config import setup_logging
+from app.exceptions.app_exceptions import AppError
 from app.exceptions.exception_handlers import register_exception_handlers
 from app.routes.health_routes import router as health_router
 from app.routes.inference_routes import router as inference_router
 from app.routes.model_routes import router as model_router
 from app.routes.result_routes import router as result_router
+from app.services.model_registry_service import ModelRegistryService
+from app.services.yolo_service import YoloService
+from app.utils.file_utils import ensure_directory_exists
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -23,16 +34,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url=(
             None if app_settings.is_production_like else "/openapi.json"
         ),
+        lifespan=_lifespan,
     )
 
     app.state.settings = app_settings
-    app.state.model_registry = None
+    app.state.model_registry = ModelRegistryService(
+        yolo_service=YoloService(model_path=app_settings.yolo_model_path),
+    )
 
     _register_middlewares(app, app_settings)
     _register_routes(app, app_settings)
     register_exception_handlers(app)
 
     return app
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings: Settings = app.state.settings
+    model_registry: ModelRegistryService = app.state.model_registry
+
+    ensure_directory_exists(settings.upload_dir)
+    ensure_directory_exists(settings.output_dir)
+
+    if settings.load_model_on_startup:
+        await run_in_threadpool(_load_and_warmup_model, model_registry)
+
+    yield
+
+
+def _load_and_warmup_model(model_registry: ModelRegistryService) -> None:
+    # A failed load keeps the API up but not ready, so /health/ready
+    # reports it and POST /models/load can retry without a restart.
+    try:
+        model_registry.load_model()
+        model_registry.warmup()
+    except AppError as exc:
+        logger.error("Model not loaded on startup: %s", exc.log_detail or exc)
+        return
+
+    logger.info("Model loaded and warmed up on startup.")
 
 
 def _register_middlewares(app: FastAPI, settings: Settings) -> None:

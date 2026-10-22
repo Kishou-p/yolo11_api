@@ -16,6 +16,7 @@ from app.exceptions.app_exceptions import (
     StorageWriteError,
     UnsupportedImageTypeError,
 )
+from app.utils.file_utils import save_bytes_to_file
 
 SUPPORTED_IMAGE_TYPES: Final[set[str]] = {
     "image/jpeg",
@@ -100,12 +101,15 @@ def save_image_to_file(
     file_path: Path,
     image: NDArray[np.uint8],
 ) -> Path:
-    success = cv2.imwrite(str(file_path), image)
+    try:
+        success, encoded_image = cv2.imencode(file_path.suffix, image)
+    except cv2.error:
+        success = False
 
     if not success:
         raise StorageWriteError(file_path)
 
-    return file_path
+    return save_bytes_to_file(file_path, encoded_image.tobytes())
 
 
 def _megabytes_to_bytes(size_mb: int) -> int:

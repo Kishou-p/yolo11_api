@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,8 @@ class ModelRegistryService:
     ) -> None:
         self._yolo_service = yolo_service
         self._loaded_model = loaded_model
+        # Ultralytics models are not safe for concurrent predict calls.
+        self._lock = threading.Lock()
 
     @property
     def model_path(self) -> Path:
@@ -29,11 +32,11 @@ class ModelRegistryService:
         return self._loaded_model is not None
 
     def load_model(self) -> Any:
-        if self.is_loaded():
-            return self._loaded_model
+        with self._lock:
+            if self._loaded_model is None:
+                self._loaded_model = self._yolo_service.load_model()
 
-        self._loaded_model = self._yolo_service.load_model()
-        return self._loaded_model
+            return self._loaded_model
 
     def get_loaded_model(self) -> Any:
         if self._loaded_model is None:
@@ -46,4 +49,9 @@ class ModelRegistryService:
         image: NDArray[np.uint8],
     ) -> list[DetectionResponse]:
         loaded_model = self.get_loaded_model()
-        return self._yolo_service.predict(loaded_model, image)
+
+        with self._lock:
+            return self._yolo_service.predict(loaded_model, image)
+
+    def warmup(self, image_size: int = 640) -> None:
+        self.run_inference(np.zeros((image_size, image_size, 3), np.uint8))
