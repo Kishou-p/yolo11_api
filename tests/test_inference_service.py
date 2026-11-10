@@ -10,7 +10,12 @@ from app.exceptions.app_exceptions import (
     ImageSignatureMismatchError,
     UnsupportedImageTypeError,
 )
-from app.schemas.inference_schema import BoundingBox, DetectionResponse
+from app.schemas.inference_schema import (
+    BoundingBox,
+    DetectionResponse,
+    InferenceParams,
+    ModelInfo,
+)
 from app.services.inference_service import InferenceService
 from app.services.model_registry_service import ModelRegistryService
 from app.services.storage_service import StorageService
@@ -59,7 +64,7 @@ def test_run_image_inference_saves_upload_annotated_image_and_result() -> None:
     assert storage_service.saved_results == [
         {
             "execution_id": "exec123",
-            "result": response.model_dump(),
+            "result": response.model_dump(mode="json"),
         }
     ]
 
@@ -114,6 +119,9 @@ def test_run_image_inference_rejects_empty_image() -> None:
 
 
 class FakeModelRegistryService:
+    model_info = ModelInfo(name="fake_model.pt", sha256="abc")
+    params = InferenceParams()
+
     def __init__(self) -> None:
         self.run_inference_calls = 0
         self.last_image: NDArray[np.uint8] | None = None

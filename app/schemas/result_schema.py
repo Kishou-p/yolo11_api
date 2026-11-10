@@ -5,7 +5,7 @@ class ResultSummaryResponse(BaseModel):
     execution_id: str
     filename: str | None = None
     result_url: str
-    annotated_image_url: str
+    annotated_image_url: str | None
     detections_count: int | None = None
 
 

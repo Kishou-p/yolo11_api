@@ -63,11 +63,11 @@ class ResultService:
     def get_annotated_image_path(self, execution_id: str) -> Path:
         validate_execution_id(execution_id)
 
-        annotated_path = self._storage_service.build_annotated_path(
+        annotated_path = self._storage_service.find_annotated_path(
             execution_id,
         )
 
-        if not annotated_path.exists():
+        if annotated_path is None:
             raise ResultNotFoundError(execution_id)
 
         return annotated_path
@@ -80,14 +80,11 @@ class ResultService:
         if not result_path.exists():
             raise ResultNotFoundError(execution_id)
 
-        self._storage_service.delete_file_if_exists(
-            self._storage_service.build_annotated_path(execution_id)
-        )
-
-        for upload_path in self._storage_service.find_upload_paths(
-            execution_id,
-        ):
-            self._storage_service.delete_file_if_exists(upload_path)
+        for path in [
+            *self._storage_service.find_annotated_paths(execution_id),
+            *self._storage_service.find_upload_paths(execution_id),
+        ]:
+            self._storage_service.delete_file_if_exists(path)
 
         # The JSON goes last so a failed delete can be retried.
         self._storage_service.delete_file_if_exists(result_path)
@@ -135,7 +132,12 @@ class ResultService:
         self,
         result_data: dict[str, Any],
         execution_id: str,
-    ) -> str:
+    ) -> str | None:
+        if "annotated_image_url" in result_data and (
+            result_data["annotated_image_url"] is None
+        ):
+            return None  # saved with SAVE_ANNOTATED=false
+
         annotated_image_url = result_data.get("annotated_image_url")
 
         if isinstance(annotated_image_url, str) and annotated_image_url:

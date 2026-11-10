@@ -6,7 +6,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from app.exceptions.app_exceptions import ModelNotLoadedError
-from app.schemas.inference_schema import DetectionResponse
+from app.schemas.inference_schema import (
+    DetectionResponse,
+    InferenceParams,
+    ModelInfo,
+)
 from app.services.yolo_service import YoloService
 
 
@@ -24,6 +28,14 @@ class ModelRegistryService:
     @property
     def model_path(self) -> Path:
         return self._yolo_service.model_path
+
+    @property
+    def model_info(self) -> ModelInfo:
+        return self._yolo_service.model_info
+
+    @property
+    def params(self) -> InferenceParams:
+        return self._yolo_service.params
 
     def model_exists(self) -> bool:
         return self._yolo_service.model_exists()
@@ -53,5 +65,6 @@ class ModelRegistryService:
         with self._lock:
             return self._yolo_service.predict(loaded_model, image)
 
-    def warmup(self, image_size: int = 640) -> None:
+    def warmup(self) -> None:
+        image_size = self.params.imgsz
         self.run_inference(np.zeros((image_size, image_size, 3), np.uint8))
