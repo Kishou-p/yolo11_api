@@ -1,9 +1,11 @@
+import logging
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
+from app.exceptions.app_exceptions import StorageDeleteError
 from app.utils.file_utils import (
     build_execution_id,
     ensure_directory_exists,
@@ -11,6 +13,16 @@ from app.utils.file_utils import (
     save_json_to_file,
 )
 from app.utils.image_utils import get_image_extension, save_image_to_file
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_mtime(path: Path) -> float:
+    # A file may be deleted between glob() and stat(); sort it last.
+    try:
+        return path.stat().st_mtime
+    except FileNotFoundError:
+        return 0.0
 
 
 class StorageService:
@@ -62,16 +74,32 @@ class StorageService:
     def list_result_paths(self) -> list[Path]:
         return sorted(
             self._output_dir.glob("*.json"),
-            key=lambda path: path.stat().st_mtime,
+            key=_safe_mtime,
             reverse=True,
         )
 
     def delete_file_if_exists(self, file_path: Path) -> bool:
-        if not file_path.exists():
+        try:
+            file_path.unlink()
+        except FileNotFoundError:
             return False
+        except OSError as exc:
+            raise StorageDeleteError(file_path) from exc
 
-        file_path.unlink()
         return True
+
+    def delete_execution_files(self, execution_id: str) -> None:
+        paths = [
+            self.build_result_path(execution_id),
+            self.build_annotated_path(execution_id),
+            *self.find_upload_paths(execution_id),
+        ]
+
+        for path in paths:
+            try:
+                self.delete_file_if_exists(path)
+            except StorageDeleteError:
+                logger.exception("Failed to delete %s", path)
 
     def save_inference_result(
         self,

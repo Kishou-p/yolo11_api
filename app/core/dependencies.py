@@ -8,7 +8,6 @@ from app.services.inference_service import InferenceService
 from app.services.result_service import ResultService
 from app.services.model_registry_service import ModelRegistryService
 from app.services.storage_service import StorageService
-from app.services.yolo_service import YoloService
 from app.exceptions.app_exceptions import UnauthorizedApiKeyError
 
 
@@ -37,31 +36,18 @@ def _matches_any_api_key(candidate: str, valid_keys: list[str]) -> bool:
     return matched
 
 
+def get_model_registry_service(request: Request) -> ModelRegistryService:
+    return cast(ModelRegistryService, request.app.state.model_registry)
+
+
 def get_health_service(
     settings: Annotated[Settings, Depends(get_settings)],
+    model_registry: Annotated[
+        ModelRegistryService,
+        Depends(get_model_registry_service),
+    ],
 ) -> HealthService:
-    return HealthService(settings=settings)
-
-
-def get_yolo_service(
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> YoloService:
-    return YoloService(model_path=settings.yolo_model_path)
-
-
-def get_model_registry_service(
-    request: Request,
-    yolo_service: Annotated[YoloService, Depends(get_yolo_service)],
-) -> ModelRegistryService:
-    current_registry = request.app.state.model_registry
-
-    if isinstance(current_registry, ModelRegistryService):
-        return current_registry
-
-    new_registry = ModelRegistryService(yolo_service=yolo_service)
-    request.app.state.model_registry = new_registry
-
-    return new_registry
+    return HealthService(settings=settings, model_registry=model_registry)
 
 
 def get_storage_service(

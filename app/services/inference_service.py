@@ -41,21 +41,9 @@ class InferenceService:
 
         filename = filename[:MAX_FILENAME_LENGTH]
         image = decode_image_bytes(image_bytes)
-        execution_id = self._storage_service.create_execution_id()
-
-        self._storage_service.save_upload(
-            execution_id=execution_id,
-            content_type=content_type,
-            image_bytes=image_bytes,
-        )
-
         detections = self._model_registry.run_inference(image)
         annotated_image = draw_detections_on_image(image, detections)
-
-        self._storage_service.save_annotated_image(
-            execution_id=execution_id,
-            image=annotated_image,
-        )
+        execution_id = self._storage_service.create_execution_id()
 
         response = InferenceResponse(
             execution_id=execution_id,
@@ -66,10 +54,25 @@ class InferenceService:
             detections=detections,
         )
 
-        self._storage_service.save_inference_result(
-            execution_id=execution_id,
-            result=response.model_dump(),
-        )
+        # Nothing is written until inference succeeds; if a write fails,
+        # remove what was already saved so no orphan files are left behind.
+        try:
+            self._storage_service.save_upload(
+                execution_id=execution_id,
+                content_type=content_type,
+                image_bytes=image_bytes,
+            )
+            self._storage_service.save_annotated_image(
+                execution_id=execution_id,
+                image=annotated_image,
+            )
+            self._storage_service.save_inference_result(
+                execution_id=execution_id,
+                result=response.model_dump(),
+            )
+        except Exception:
+            self._storage_service.delete_execution_files(execution_id)
+            raise
 
         return response
 
