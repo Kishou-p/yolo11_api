@@ -1,8 +1,12 @@
-fastapi
-uvicorn[standard]
-ultralytics
-python-multipart
-pydantic-settings
-opencv-python-headless
-pytest
-httpx
+# Runtime dependencies, pinned for reproducible builds.
+# torch/torchvision are installed by the Dockerfile from TORCH_INDEX_URL
+# (CPU wheels by default) before this file.
+fastapi==0.159.1
+uvicorn[standard]==0.54.0
+ultralytics==8.4.183
+python-multipart==0.0.32
+pydantic==2.14.1
+pydantic-settings==2.16.1
+opencv-python-headless==5.0.0.93
+pillow==13.0.0
+numpy==2.5.4

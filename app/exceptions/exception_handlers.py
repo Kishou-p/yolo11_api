@@ -14,7 +14,7 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     logger.warning(
         "Application error at %s: %s",
         request.url.path,
-        exc.message,
+        exc.log_detail or exc.message,
     )
 
     return JSONResponse(

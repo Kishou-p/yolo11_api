@@ -125,7 +125,7 @@ def test_image_inference_requires_loaded_model(
 
     assert response.status_code == 409
     assert response.json() == {
-        "detail": f"YOLO model is not loaded: {model_path}",
+        "detail": "YOLO model is not loaded.",
     }
 
 
@@ -192,3 +192,26 @@ def _fake_run_inference(
             ),
         )
     ]
+
+def test_upload_extension_comes_from_content_type(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    client = _build_test_client(tmp_path)
+    monkeypatch.setattr(
+        ModelRegistryService,
+        "run_inference",
+        _fake_run_inference,
+    )
+
+    response = client.post(
+        "/api/v1/inference/image",
+        files={"file": ("shell.php", _build_test_image_bytes(), "image/jpeg")},
+        headers=AUTH_HEADERS,
+    )
+
+    execution_id = response.json()["execution_id"]
+    saved_uploads = [path.name for path in (tmp_path / "uploads").iterdir()]
+
+    assert response.status_code == 200
+    assert saved_uploads == [f"{execution_id}.jpg"]

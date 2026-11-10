@@ -6,22 +6,14 @@
 ![CI](https://img.shields.io/badge/CI-GitHub%20Actions-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-API REST em **FastAPI** para carregamento, gerenciamento e inferência com modelos YOLO11.
-
-O projeto foi desenvolvido com foco em arquitetura limpa, separação de responsabilidades, testes automatizados, proteção por API Key, persistência de resultados e execução com Docker.
-
----
+API REST em **FastAPI** para carregamento, gerenciamento e inferência com modelos YOLO11, com arquitetura em camadas, validação de uploads, persistência interna de resultados e proteção das rotas sensíveis por API Key.
 
 ## Visão geral
-
-A YOLO11 API permite enviar uma imagem para inferência com um modelo YOLO11.
-
-Fluxo principal:
 
 ```text
 Imagem enviada
     ↓
-API valida o upload
+API valida o upload (tipo, assinatura, tamanho e resolução)
     ↓
 Modelo YOLO11 executa a inferência
     ↓
@@ -30,263 +22,107 @@ API salva o upload, o JSON de resultado e a imagem anotada
 API retorna execution_id, result_url e annotated_image_url
 ```
 
-A resposta pública não expõe caminhos internos do servidor.
+## Funcionalidades
 
----
-
-## Status do projeto
-
-Estado atual validado:
-
-- API base funcionando.
-- Arquitetura limpa em camadas.
-- YOLO11 isolado em `app/services/yolo_service.py`.
-- Modelo cacheado em memória via `app.state`.
-- Inferência com upload de imagem funcionando.
-- Upload original, JSON de resultado e imagem anotada salvos internamente.
-- Resposta pública sem vazamento de paths internos.
-- Rotas sensíveis protegidas por `X-API-Key`.
-- CORS controlado por configuração.
-- Testes automatizados passando.
-- Docker validado.
-- Docker Compose validado com volumes persistentes.
-- GitHub Actions configurado para testes e Docker build.
-
----
+- Health checks de liveness (`/health/live`) e readiness (`/health/ready`).
+- Modelo carregado e aquecido automaticamente na inicialização, com verificação de SHA-256.
+- Inferência por upload de imagem (JPEG, PNG, WebP) com limite de tamanho e de resolução.
+- Upload original, JSON de resultado e imagem anotada salvos com escrita atômica.
+- Consulta, listagem paginada e remoção de resultados por `execution_id`.
+- Rotas sensíveis protegidas por `X-API-Key`, com suporte a rotação de chaves.
+- Respostas sem caminhos internos; `/docs` desabilitado fora de development/test.
 
 ## Arquitetura
 
 ```text
 app/
-├── core/          # Configuração, dependências, logging e app state
+├── core/          # Configuração, dependências e logging
 ├── exceptions/    # Exceções customizadas e handlers globais
 ├── routes/        # Camada HTTP
-├── schemas/       # Contratos Pydantic
+├── schemas/       # Contratos Pydantic de entrada e saída
 ├── services/      # Regras de negócio e orquestração
-├── utils/         # Funções auxiliares puras
-└── main.py        # Factory da aplicação FastAPI
+├── utils/         # Funções auxiliares
+└── main.py        # Factory da aplicação e ciclo de vida (carga do modelo)
 
 data/
-├── models/        # Modelos YOLO
+├── models/        # Modelos YOLO (montado somente leitura no container)
 ├── uploads/       # Imagens recebidas
 └── outputs/       # JSONs e imagens anotadas
 
 tests/             # Testes automatizados
 ```
 
-Regra principal do projeto:
-
-```text
-ultralytics só deve ser importado em app/services/yolo_service.py
-```
-
-As rotas não devem importar YOLO diretamente, manipular regra de negócio pesada ou acessar caminhos internos.
-
----
+Regra principal do projeto: `ultralytics` só deve ser importado em `app/services/yolo_service.py`. As rotas não importam YOLO diretamente, não fazem regra de negócio pesada e não acessam caminhos internos.
 
 ## Endpoints
 
-### Público
+Prefixo padrão: `/api/v1`.
 
-```http
-GET /api/v1/health
+| Método | Rota | Autenticação | Descrição |
+| --- | --- | --- | --- |
+| GET | `/health`, `/health/live` | Não | Processo está vivo |
+| GET | `/health/ready` | Não | Modelo carregado, diretórios graváveis e espaço em disco (503 se não estiver pronto) |
+| GET | `/models/status` | Sim | Nome do modelo, existência e se está carregado |
+| POST | `/models/load` | Sim | Carrega o modelo (útil se a carga na inicialização falhou) |
+| POST | `/inference/image` | Sim | Envia imagem (`multipart/form-data`, campo `file`) |
+| GET | `/results?limit=100&offset=0` | Sim | Lista resultados, do mais recente para o mais antigo |
+| GET | `/results/{execution_id}` | Sim | JSON do resultado |
+| GET | `/results/{execution_id}/image` | Sim | Imagem anotada |
+| DELETE | `/results/{execution_id}` | Sim | Remove resultado, imagem anotada e upload |
+
+## Configuração
+
+Copie `.env.example` para `.env` e ajuste. Principais variáveis:
+
+| Variável | Padrão | Descrição |
+| --- | --- | --- |
+| `ENVIRONMENT` | `production` | `development`, `test`, `staging` ou `production`. Fora de development/test exige chave forte e desliga `/docs` |
+| `API_KEY` | — | Chave principal. Mínimo de 32 caracteres fora de development/test |
+| `EXTRA_API_KEYS` | `[]` | Chaves adicionais aceitas (JSON), para rotação sem downtime |
+| `YOLO_MODEL_PATH` | `data/models/yolo11n.pt` | Caminho do modelo |
+| `YOLO_MODEL_SHA256` | — | Hash esperado do modelo; a carga é recusada se não bater |
+| `LOAD_MODEL_ON_STARTUP` | `true` | Carrega e aquece o modelo ao iniciar |
+| `MAX_IMAGE_SIZE_MB` | `10` | Tamanho máximo do upload |
+| `MAX_IMAGE_PIXELS` | `40000000` | Resolução máxima (largura × altura) |
+| `MIN_FREE_DISK_MB` | `500` | Abaixo disso, `/health/ready` retorna 503 |
+| `ALLOWED_ORIGINS` | localhost:3000 | Origens CORS permitidas (JSON) |
+
+Gerar uma chave:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-### Protegidos por API Key
+## Desenvolvimento
 
-As rotas abaixo exigem o header:
-
-```http
-X-API-Key: dev-secret-key
-```
-
-```http
-GET  /api/v1/models/status
-POST /api/v1/models/load
-POST /api/v1/inference/image
-GET  /api/v1/results/{execution_id}
-GET  /api/v1/results/{execution_id}/image
-```
-
----
-
-## Variáveis de ambiente
-
-Crie um arquivo `.env` na raiz do projeto:
-
-```env
-APP_NAME=YOLO11 API
-APP_VERSION=0.1.0
-ENVIRONMENT=development
-LOG_LEVEL=INFO
-API_PREFIX=/api/v1
-
-YOLO_MODEL_PATH=data/models/yolo11n.pt
-MAX_IMAGE_SIZE_MB=10
-
-UPLOAD_DIR=data/uploads
-OUTPUT_DIR=data/outputs
-
-API_KEY=dev-secret-key
-
-ALLOWED_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000","http://localhost:8000","http://127.0.0.1:8000"]
-```
-
-Ao usar Docker, evite aspas em valores simples.
-
-Use:
-
-```env
-LOG_LEVEL=INFO
-API_KEY=dev-secret-key
-API_PREFIX=/api/v1
-```
-
-Evite:
-
-```env
-LOG_LEVEL="INFO"
-API_KEY="dev-secret-key"
-API_PREFIX="/api/v1"
-```
-
----
-
-## Rodando localmente
-
-Acesse o projeto:
-
-```powershell
-cd C:\Projetos\yolo11_api
-```
-
-Ative o ambiente virtual:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Instale as dependências:
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-Rode os testes:
-
-```powershell
-python -m pytest
-```
-
-Suba a API:
-
-```powershell
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
 uvicorn app.main:create_app --factory --reload
 ```
 
-Acesse a documentação Swagger:
+## Demo rápida (PowerShell)
 
-```text
-http://127.0.0.1:8000/docs
-```
-
----
-
-## Rodando com Docker
-
-Build da imagem:
+Com a API rodando, o modelo já é carregado na inicialização:
 
 ```powershell
-docker build -t yolo11-api:latest .
+Invoke-RestMethod http://127.0.0.1:8000/api/v1/health/ready
+
+$headers = @{ "X-API-Key" = "<sua API_KEY>" }
+
+curl.exe -X POST "http://127.0.0.1:8000/api/v1/inference/image" `
+  -H "X-API-Key: <sua API_KEY>" `
+  -F "file=@C:\caminho\para\imagem.png"
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/results/<execution_id>" -Headers $headers
+
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/v1/results/<execution_id>/image" `
+  -Headers $headers -OutFile ".\annotated_result.png"
 ```
 
-Rodar container:
-
-```powershell
-docker run --rm `
-  -p 8000:8000 `
-  --env-file .env `
-  -e YOLO_CONFIG_DIR=/tmp `
-  yolo11-api:latest
-```
-
-Testar health check:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
-```
-
----
-
-## Rodando com Docker Compose
-
-Subir a API:
-
-```powershell
-docker compose up -d --build
-```
-
-Ver containers:
-
-```powershell
-docker compose ps
-```
-
-Ver logs:
-
-```powershell
-docker compose logs -f
-```
-
-Parar a API:
-
-```powershell
-docker compose down
-```
-
-O `docker-compose.yml` usa volumes persistentes para:
-
-- `data/uploads`
-- `data/outputs`
-- `data/models`
-
----
-
-## Demo rápida
-
-Com a API rodando via Docker Compose:
-
-```powershell
-docker compose up -d --build
-```
-
-Health check:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
-```
-
-Carregar modelo:
-
-```powershell
-Invoke-RestMethod `
-  -Method Post `
-  -Uri http://127.0.0.1:8000/api/v1/models/load `
-  -Headers @{ "X-API-Key" = "dev-secret-key" }
-```
-
-Executar inferência:
-
-```powershell
-$imagePath = "C:\caminho\para\sua-imagem.png"
-
-curl.exe -X POST `
-  "http://127.0.0.1:8000/api/v1/inference/image" `
-  -H "X-API-Key: dev-secret-key" `
-  -F "file=@$imagePath"
-```
-
-Exemplo de resposta:
+Exemplo de resposta da inferência:
 
 ```json
 {
@@ -299,138 +135,46 @@ Exemplo de resposta:
 }
 ```
 
-Consultar resultado:
+No `.env`, evite aspas em valores simples (`API_KEY=abc`, não `API_KEY="abc"`), porque o Docker as mantém no valor.
 
-```powershell
-Invoke-RestMethod `
-  -Uri "http://127.0.0.1:8000/api/v1/results/1a3468eee54747699873d461cf15db31" `
-  -Headers @{ "X-API-Key" = "dev-secret-key" }
+## Docker
+
+```bash
+cp .env.example .env   # ajuste API_KEY e ENVIRONMENT
+# O container roda como o usuário 10001: dê permissão de escrita nos volumes
+sudo chown -R 10001:10001 data/uploads data/outputs
+docker compose up -d --build
+docker compose ps        # o status mostra "healthy" quando /health/ready responde 200
 ```
 
-Baixar imagem anotada:
+A imagem instala o PyTorch para CPU por padrão. Para GPU NVIDIA:
 
-```powershell
-Invoke-WebRequest `
-  -Uri "http://127.0.0.1:8000/api/v1/results/1a3468eee54747699873d461cf15db31/image" `
-  -Headers @{ "X-API-Key" = "dev-secret-key" } `
-  -OutFile ".\annotated_result.png"
+```bash
+docker compose build --build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
 ```
 
----
+e adicione a reserva de GPU (`deploy.resources.reservations.devices`) no `docker-compose.yml`.
 
-## Testes
+## Produção
 
-Rodar todos os testes:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest
-```
-
-Estado validado:
-
-```text
-87 passed
-```
-
----
+- A porta 8000 é publicada apenas em `127.0.0.1`. Coloque um proxy reverso com TLS (Nginx, Traefik ou Caddy) na frente, com `client_max_body_size` próximo de `MAX_IMAGE_SIZE_MB` e limite de requisições.
+- Mantenha a API em uma rede segmentada, acessível só pelos sistemas que precisam dela.
+- Para trocar o modelo: copie o novo arquivo para `data/models/`, atualize `YOLO_MODEL_SHA256` e reinicie o container.
+- Os arquivos em `data/uploads` e `data/outputs` não são removidos automaticamente; defina uma rotina de retenção conforme a necessidade de rastreabilidade.
 
 ## CI
 
-O projeto usa GitHub Actions para validar:
-
-- instalação de dependências Python;
-- execução dos testes automatizados;
-- build da imagem Docker.
-
-O workflow está em:
-
-```text
-.github/workflows/ci.yml
-```
-
----
-
-## Segurança
-
-A API usa proteção por API Key nas rotas sensíveis.
-
-Header esperado:
-
-```http
-X-API-Key: dev-secret-key
-```
-
-Para uso real, altere a variável:
-
-```env
-API_KEY=dev-secret-key
-```
-
-para uma chave segura.
-
-A autenticação atual é suficiente para demonstração e portfólio, mas para produção real recomenda-se evoluir para múltiplas chaves, escopos de permissão ou JWT.
-
----
-
-## Persistência
-
-A API salva internamente:
-
-- imagem original enviada;
-- JSON com resultado da inferência;
-- imagem anotada.
-
-A resposta pública não expõe paths internos. Em vez disso, usa:
-
-- `execution_id`
-- `result_url`
-- `annotated_image_url`
-
----
-
-## Auditoria técnica
-
-O projeto passou por uma auditoria técnica cobrindo:
-
-- arquitetura;
-- separação de responsabilidades;
-- segurança básica;
-- Docker e Docker Compose;
-- persistência de resultados;
-- testes automatizados;
-- riscos técnicos;
-- roadmap de evolução.
-
-Principais pontos de atenção:
-
-- A imagem Docker ainda é grande por causa de dependências como `ultralytics`, `torch` e OpenCV.
-- A API Key única é adequada para demonstração, mas limitada para múltiplos usuários.
-- O cache do modelo em `app.state` funciona bem em um processo, mas precisa de adaptação para múltiplos workers.
-- O projeto pode evoluir com histórico de resultados, deleção de resultados, logs estruturados e status de storage.
-
----
+O workflow em `.github/workflows/ci.yml` roda os testes automatizados e o build da imagem Docker a cada push na `main` e em cada pull request.
 
 ## Roadmap
 
-Próximos passos planejados:
-
-1. Consolidar documentação e repositório.
-2. Melhorar logs com execution_id.
-3. Adicionar endpoint de status do storage.
-4. Otimizar tamanho da imagem Docker.
-5. Criar interface web para upload e visualização.
-6. Criar fluxo de feedback para dataset.
-7. Evoluir para detecção de anomalias.
-8. Automatizar coleta e organização de imagens.
-4. Melhorar logs com `execution_id`.
-5. Adicionar endpoint de status do storage.
-6. Otimizar tamanho da imagem Docker.
-7. Criar interface web para upload e visualização.
-8. Criar fluxo de feedback para dataset.
-9. Evoluir para detecção de anomalias.
-10. Automatizar coleta e organização de imagens.
-
----
+1. Retenção automática de uploads e resultados.
+2. Parâmetros de inferência configuráveis (confiança, IoU, tamanho, device).
+3. Logs estruturados com `execution_id` e métricas Prometheus.
+4. Interface web para upload e visualização.
+5. Fluxo de feedback para dataset.
+6. Evolução para detecção de anomalias.
+7. Coleta e organização automática de imagens.
 
 ## Licença
 

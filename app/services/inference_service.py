@@ -5,9 +5,12 @@ from app.utils.annotation_utils import draw_detections_on_image
 from app.utils.image_utils import (
     decode_image_bytes,
     validate_image_content_type,
+    validate_image_dimensions,
     validate_image_signature,
     validate_image_size,
 )
+
+MAX_FILENAME_LENGTH = 255
 
 
 class InferenceService:
@@ -17,10 +20,12 @@ class InferenceService:
         storage_service: StorageService,
         max_image_size_mb: int,
         api_prefix: str,
+        max_image_pixels: int = 40_000_000,
     ) -> None:
         self._model_registry = model_registry
         self._storage_service = storage_service
         self._max_image_size_mb = max_image_size_mb
+        self._max_image_pixels = max_image_pixels
         self._api_prefix = api_prefix
 
     def run_image_inference(
@@ -32,23 +37,13 @@ class InferenceService:
         validate_image_content_type(content_type)
         validate_image_size(image_bytes, self._max_image_size_mb)
         validate_image_signature(content_type, image_bytes)
+        validate_image_dimensions(image_bytes, self._max_image_pixels)
 
+        filename = filename[:MAX_FILENAME_LENGTH]
         image = decode_image_bytes(image_bytes)
-        execution_id = self._storage_service.create_execution_id()
-
-        self._storage_service.save_upload(
-            execution_id=execution_id,
-            original_filename=filename,
-            image_bytes=image_bytes,
-        )
-
         detections = self._model_registry.run_inference(image)
         annotated_image = draw_detections_on_image(image, detections)
-
-        self._storage_service.save_annotated_image(
-            execution_id=execution_id,
-            image=annotated_image,
-        )
+        execution_id = self._storage_service.create_execution_id()
 
         response = InferenceResponse(
             execution_id=execution_id,
@@ -59,10 +54,25 @@ class InferenceService:
             detections=detections,
         )
 
-        self._storage_service.save_inference_result(
-            execution_id=execution_id,
-            result=response.model_dump(),
-        )
+        # Nothing is written until inference succeeds; if a write fails,
+        # remove what was already saved so no orphan files are left behind.
+        try:
+            self._storage_service.save_upload(
+                execution_id=execution_id,
+                content_type=content_type,
+                image_bytes=image_bytes,
+            )
+            self._storage_service.save_annotated_image(
+                execution_id=execution_id,
+                image=annotated_image,
+            )
+            self._storage_service.save_inference_result(
+                execution_id=execution_id,
+                result=response.model_dump(),
+            )
+        except Exception:
+            self._storage_service.delete_execution_files(execution_id)
+            raise
 
         return response
 

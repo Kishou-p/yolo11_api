@@ -62,7 +62,7 @@ def test_get_loaded_model_raises_when_model_is_not_loaded() -> None:
         registry.get_loaded_model()
 
     assert exc_info.value.status_code == 409
-    assert exc_info.value.message == "YOLO model is not loaded: fake_model.pt"
+    assert exc_info.value.message == "YOLO model is not loaded."
 
 
 def test_run_inference_raises_when_model_is_not_loaded() -> None:
