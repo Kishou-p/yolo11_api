@@ -1,23 +1,33 @@
+from io import BytesIO
 from pathlib import Path
 from typing import Callable, Final
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
+from PIL import Image, UnidentifiedImageError
 
 from app.exceptions.app_exceptions import (
     EmptyImageError,
     ImageDecodeError,
+    ImageDimensionsTooLargeError,
     ImageSignatureMismatchError,
     ImageTooLargeError,
     StorageWriteError,
     UnsupportedImageTypeError,
 )
+from app.utils.file_utils import save_bytes_to_file
 
 SUPPORTED_IMAGE_TYPES: Final[set[str]] = {
     "image/jpeg",
     "image/png",
     "image/webp",
+}
+
+IMAGE_EXTENSIONS: Final[dict[str, str]] = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
 }
 
 IMAGE_SIGNATURE_VALIDATORS: Final[dict[str, Callable[[bytes], bool]]] = {
@@ -60,6 +70,23 @@ def validate_image_signature(
         raise ImageSignatureMismatchError(content_type)
 
 
+def validate_image_dimensions(image_bytes: bytes, max_pixels: int) -> None:
+    """Read only the image header, so oversized images are rejected
+    before OpenCV allocates memory for the decoded pixels."""
+    try:
+        with Image.open(BytesIO(image_bytes)) as image:
+            width, height = image.size
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise ImageDecodeError() from None
+
+    if width * height > max_pixels:
+        raise ImageDimensionsTooLargeError(max_pixels)
+
+
+def get_image_extension(content_type: str | None) -> str:
+    return IMAGE_EXTENSIONS.get(str(content_type), ".bin")
+
+
 def decode_image_bytes(image_bytes: bytes) -> NDArray[np.uint8]:
     image_array = np.frombuffer(image_bytes, dtype=np.uint8)
     decoded_image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
@@ -74,12 +101,15 @@ def save_image_to_file(
     file_path: Path,
     image: NDArray[np.uint8],
 ) -> Path:
-    success = cv2.imwrite(str(file_path), image)
+    try:
+        success, encoded_image = cv2.imencode(file_path.suffix, image)
+    except cv2.error:
+        success = False
 
     if not success:
         raise StorageWriteError(file_path)
 
-    return file_path
+    return save_bytes_to_file(file_path, encoded_image.tobytes())
 
 
 def _megabytes_to_bytes(size_mb: int) -> int:

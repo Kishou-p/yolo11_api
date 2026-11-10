@@ -15,12 +15,7 @@ def test_health_route_is_public_without_api_key(tmp_path: Path) -> None:
     response = client.get("/api/v1/health")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok",
-        "app_name": "Test YOLO11 API",
-        "version": "0.0.1",
-        "environment": "test",
-    }
+    assert response.json() == {"status": "ok"}
 
 
 def test_protected_route_rejects_missing_api_key(tmp_path: Path) -> None:
@@ -59,7 +54,7 @@ def test_protected_route_accepts_valid_api_key(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json() == {
-        "model_path": str(model_path),
+        "model_name": model_path.name,
         "exists": False,
         "loaded": False,
     }

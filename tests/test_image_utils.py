@@ -94,7 +94,7 @@ def test_save_image_to_file_raises_storage_error_for_invalid_path(
         save_image_to_file(invalid_path, image)
 
     assert exc_info.value.status_code == 500
-    assert exc_info.value.message == f"Failed to write file: {invalid_path}"
+    assert exc_info.value.message == "Failed to write file."
 
 
 def _build_test_image_bytes() -> bytes:

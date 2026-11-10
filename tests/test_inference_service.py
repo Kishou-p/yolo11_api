@@ -51,7 +51,7 @@ def test_run_image_inference_saves_upload_annotated_image_and_result() -> None:
     assert storage_service.saved_uploads == [
         {
             "execution_id": "exec123",
-            "original_filename": "test.jpg",
+            "content_type": "image/jpeg",
             "image_bytes": image_bytes,
         }
     ]
@@ -140,13 +140,13 @@ class FakeStorageService:
     def save_upload(
         self,
         execution_id: str,
-        original_filename: str,
+        content_type: str | None,
         image_bytes: bytes,
     ) -> None:
         self.saved_uploads.append(
             {
                 "execution_id": execution_id,
-                "original_filename": original_filename,
+                "content_type": content_type,
                 "image_bytes": image_bytes,
             }
         )

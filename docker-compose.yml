@@ -5,14 +5,29 @@ services:
       dockerfile: Dockerfile
     image: yolo11-api:latest
     container_name: yolo11-api
+    # Published on localhost only: put a TLS reverse proxy in front of it
+    # (or attach the proxy to this compose network) instead of exposing 8000.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
-    environment:
-      YOLO_CONFIG_DIR: /tmp
     volumes:
       - ./data/uploads:/app/data/uploads
       - ./data/outputs:/app/data/outputs
-      - ./data/models:/app/data/models
+      - ./data/models:/app/data/models:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 4g
+    cpus: 4
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     restart: unless-stopped

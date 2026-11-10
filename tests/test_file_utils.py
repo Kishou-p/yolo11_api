@@ -91,7 +91,7 @@ def test_save_bytes_to_file_raises_storage_error_for_invalid_path(
         save_bytes_to_file(file_path, b"hello")
 
     assert exc_info.value.status_code == 500
-    assert exc_info.value.message == f"Failed to write file: {file_path}"
+    assert exc_info.value.message == "Failed to write file."
 
 
 def test_save_json_to_file_writes_json_content(tmp_path: Path) -> None:
@@ -117,4 +117,4 @@ def test_save_json_to_file_raises_storage_error_for_invalid_path(
         save_json_to_file(file_path, {"ok": True})
 
     assert exc_info.value.status_code == 500
-    assert exc_info.value.message == f"Failed to write file: {file_path}"
+    assert exc_info.value.message == "Failed to write file."

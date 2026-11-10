@@ -11,6 +11,9 @@ class ResultSummaryResponse(BaseModel):
 
 class ResultListResponse(BaseModel):
     count: int
+    total: int
+    limit: int
+    offset: int
     results: list[ResultSummaryResponse]
 
 

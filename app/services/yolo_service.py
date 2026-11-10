@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import logging
 from pathlib import Path
 from typing import Any
@@ -7,6 +9,7 @@ from numpy.typing import NDArray
 from ultralytics import YOLO
 
 from app.exceptions.app_exceptions import (
+    ModelChecksumMismatchError,
     ModelFileNotFoundError,
     ModelInferenceError,
     ModelLoadError,
@@ -17,8 +20,15 @@ logger = logging.getLogger(__name__)
 
 
 class YoloService:
-    def __init__(self, model_path: Path) -> None:
+    def __init__(
+        self,
+        model_path: Path,
+        expected_sha256: str | None = None,
+    ) -> None:
         self._model_path = model_path
+        self._expected_sha256 = (
+            expected_sha256.strip().lower() if expected_sha256 else None
+        )
 
     @property
     def model_path(self) -> Path:
@@ -29,6 +39,7 @@ class YoloService:
 
     def load_model(self) -> Any:
         self._ensure_model_file_exists()
+        self._verify_checksum()
         return self._build_model()
 
     def predict(
@@ -48,6 +59,26 @@ class YoloService:
         if not self.model_exists():
             logger.warning("YOLO model file not found: %s", self._model_path)
             raise ModelFileNotFoundError(self._model_path)
+
+    def _verify_checksum(self) -> None:
+        # .pt files are pickles: loading a tampered file runs arbitrary code,
+        # so the hash is checked before the file reaches torch.
+        if self._expected_sha256 is None:
+            logger.warning(
+                "YOLO_MODEL_SHA256 is not set; model integrity is not checked."
+            )
+            return
+
+        actual_sha256 = _sha256_file(self._model_path)
+
+        if not hmac.compare_digest(actual_sha256, self._expected_sha256):
+            logger.error(
+                "Model checksum mismatch for %s: expected %s, got %s",
+                self._model_path,
+                self._expected_sha256,
+                actual_sha256,
+            )
+            raise ModelChecksumMismatchError(self._model_path)
 
     def _build_model(self) -> Any:
         try:
@@ -98,3 +129,12 @@ class YoloService:
         x1, y1, x2, y2 = coordinates
 
         return float(x1), float(y1), float(x2), float(y2)
+
+def _sha256_file(file_path: Path) -> str:
+    digest = hashlib.sha256()
+
+    with file_path.open("rb") as model_file:
+        for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
+            digest.update(chunk)
+
+    return digest.hexdigest()
