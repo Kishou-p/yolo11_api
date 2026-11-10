@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -6,6 +7,7 @@ import pytest
 from pytest import MonkeyPatch
 
 from app.exceptions.app_exceptions import (
+    ModelChecksumMismatchError,
     ModelFileNotFoundError,
     ModelInferenceError,
 )
@@ -163,3 +165,34 @@ def _build_fake_result() -> FakeResult:
 
 def _build_fake_box() -> FakeBox:
     return FakeBox()
+
+def test_load_model_rejects_checksum_mismatch(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    model_path = tmp_path / "model.pt"
+    model_path.write_bytes(b"tampered-model")
+    fake_yolo = FakeYoloFactory()
+    monkeypatch.setattr(yolo_service, "YOLO", fake_yolo)
+    service = YoloService(model_path=model_path, expected_sha256="0" * 64)
+
+    with pytest.raises(ModelChecksumMismatchError):
+        service.load_model()
+
+    assert fake_yolo.received_path is None
+
+
+def test_load_model_accepts_matching_checksum(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    model_path = tmp_path / "model.pt"
+    model_path.write_bytes(b"trusted-model")
+    expected = hashlib.sha256(b"trusted-model").hexdigest().upper()
+    fake_yolo = FakeYoloFactory()
+    monkeypatch.setattr(yolo_service, "YOLO", fake_yolo)
+    service = YoloService(model_path=model_path, expected_sha256=expected)
+
+    service.load_model()
+
+    assert fake_yolo.received_path == str(model_path)

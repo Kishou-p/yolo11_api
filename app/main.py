@@ -39,7 +39,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.state.settings = app_settings
     app.state.model_registry = ModelRegistryService(
-        yolo_service=YoloService(model_path=app_settings.yolo_model_path),
+        yolo_service=YoloService(
+            model_path=app_settings.yolo_model_path,
+            expected_sha256=app_settings.yolo_model_sha256,
+        ),
     )
 
     _register_middlewares(app, app_settings)
