@@ -1,8 +1,10 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.schemas.inference_schema import InferenceParams
 
 WEAK_API_KEYS = frozenset({"", "change-me", "dev-secret-key"})
 MIN_API_KEY_LENGTH = 32
@@ -16,17 +18,35 @@ class Settings(BaseSettings):
         "production"
     )
     log_level: str = "INFO"
+    log_format: Literal["text", "json"] = "text"
+    metrics_enabled: bool = True
     api_prefix: str = "/api/v1"
 
     yolo_model_path: Path = Path("data/models/yolo11n.pt")
     yolo_model_sha256: str | None = None
     load_model_on_startup: bool = True
+
+    # Inference parameters (Ultralytics predict arguments). They are process
+    # decisions: every result records the values that produced it.
+    yolo_conf: float = Field(default=0.25, ge=0.0, le=1.0)
+    yolo_iou: float = Field(default=0.7, ge=0.0, le=1.0)
+    yolo_imgsz: int = Field(default=640, ge=32, le=4096)
+    yolo_max_det: int = Field(default=300, ge=1, le=10000)
+    yolo_device: str | None = None
+    yolo_half: bool = False
+
     max_image_size_mb: int = 10
     max_image_pixels: int = 40_000_000
 
     upload_dir: Path = Path("data/uploads")
     output_dir: Path = Path("data/outputs")
     min_free_disk_mb: int = 500
+    save_uploads: bool = True
+    save_annotated: bool = True
+    annotated_image_format: Literal["png", "jpg"] = "png"
+    # 0 disables automatic cleanup of uploads and results.
+    retention_days: int = Field(default=0, ge=0)
+    retention_interval_minutes: int = Field(default=60, ge=1)
 
     api_key: SecretStr = SecretStr("dev-secret-key")
     extra_api_keys: list[SecretStr] = []
@@ -50,9 +70,27 @@ class Settings(BaseSettings):
     def max_image_size_bytes(self) -> int:
         return self.max_image_size_mb * 1024 * 1024
 
+    @property
+    def inference_params(self) -> InferenceParams:
+        return InferenceParams(
+            conf=self.yolo_conf,
+            iou=self.yolo_iou,
+            imgsz=self.yolo_imgsz,
+            max_det=self.yolo_max_det,
+            device=self.yolo_device,
+            half=self.yolo_half,
+        )
+
     def valid_api_keys(self) -> list[str]:
         keys = [self.api_key, *self.extra_api_keys]
         return [key.get_secret_value() for key in keys if key.get_secret_value()]
+
+    @field_validator("yolo_device", "yolo_model_sha256", mode="before")
+    @classmethod
+    def _empty_string_as_none(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @model_validator(mode="after")
     def _validate_api_keys(self) -> "Settings":

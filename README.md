@@ -31,6 +31,9 @@ API retorna execution_id, result_url e annotated_image_url
 - Consulta, listagem paginada e remoção de resultados por `execution_id`.
 - Rotas sensíveis protegidas por `X-API-Key`, com suporte a rotação de chaves.
 - Respostas sem caminhos internos; `/docs` desabilitado fora de development/test.
+- Parâmetros de inferência configuráveis; cada resultado registra modelo (nome e SHA-256), parâmetros, data e tempos.
+- Retenção automática de arquivos e opção de não salvar o upload ou a imagem anotada.
+- Logs em texto ou JSON com `request_id`, e métricas Prometheus em `/metrics`.
 
 ## Arquitetura
 
@@ -69,6 +72,9 @@ Prefixo padrão: `/api/v1`.
 | GET | `/results/{execution_id}` | Sim | JSON do resultado |
 | GET | `/results/{execution_id}/image` | Sim | Imagem anotada |
 | DELETE | `/results/{execution_id}` | Sim | Remove resultado, imagem anotada e upload |
+| GET | `/metrics` (sem prefixo) | Sim | Métricas Prometheus (desligue com `METRICS_ENABLED=false`) |
+
+Toda resposta traz o header `X-Request-ID`. Se o cliente enviar um `X-Request-ID` válido (até 64 caracteres, letras, números, `.`, `_` e `-`), ele é reaproveitado, o que permite rastrear uma peça ou câmera de ponta a ponta nos logs.
 
 ## Configuração
 
@@ -86,6 +92,17 @@ Copie `.env.example` para `.env` e ajuste. Principais variáveis:
 | `MAX_IMAGE_PIXELS` | `40000000` | Resolução máxima (largura × altura) |
 | `MIN_FREE_DISK_MB` | `500` | Abaixo disso, `/health/ready` retorna 503 |
 | `ALLOWED_ORIGINS` | localhost:3000 | Origens CORS permitidas (JSON) |
+| `YOLO_CONF` / `YOLO_IOU` | `0.25` / `0.7` | Confiança mínima e IoU do NMS |
+| `YOLO_IMGSZ` | `640` | Tamanho de entrada da rede |
+| `YOLO_MAX_DET` | `300` | Máximo de detecções por imagem |
+| `YOLO_DEVICE` | automático | `cpu`, `0` (primeira GPU) etc. |
+| `YOLO_HALF` | `false` | Meia precisão (só GPU) |
+| `SAVE_UPLOADS` / `SAVE_ANNOTATED` | `true` | Salvar a imagem original e a anotada |
+| `ANNOTATED_IMAGE_FORMAT` | `png` | `png` ou `jpg` (bem menor) |
+| `RETENTION_DAYS` | `0` | Apaga arquivos mais antigos que N dias (0 = desligado) |
+| `RETENTION_INTERVAL_MINUTES` | `60` | Intervalo da limpeza |
+| `LOG_FORMAT` | `text` | `text` ou `json` |
+| `METRICS_ENABLED` | `true` | Habilita `GET /metrics` |
 
 Gerar uma chave:
 
@@ -160,7 +177,31 @@ e adicione a reserva de GPU (`deploy.resources.reservations.devices`) no `docker
 - A porta 8000 é publicada apenas em `127.0.0.1`. Coloque um proxy reverso com TLS (Nginx, Traefik ou Caddy) na frente, com `client_max_body_size` próximo de `MAX_IMAGE_SIZE_MB` e limite de requisições.
 - Mantenha a API em uma rede segmentada, acessível só pelos sistemas que precisam dela.
 - Para trocar o modelo: copie o novo arquivo para `data/models/`, atualize `YOLO_MODEL_SHA256` e reinicie o container.
-- Os arquivos em `data/uploads` e `data/outputs` não são removidos automaticamente; defina uma rotina de retenção conforme a necessidade de rastreabilidade.
+- Defina `RETENTION_DAYS` conforme a necessidade de rastreabilidade; com `0`, os arquivos em `data/uploads` e `data/outputs` nunca são apagados.
+- Use `LOG_FORMAT=json` para enviar logs a Loki, ELK ou Graylog.
+
+## Observabilidade
+
+Exemplo de coleta pelo Prometheus (2.55+ ou 3.x, que aceitam headers customizados):
+
+```yaml
+scrape_configs:
+  - job_name: yolo11-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["yolo11-api:8000"]
+    http_headers:
+      X-API-Key:
+        secrets: ["<sua API_KEY>"]
+```
+
+Principais métricas:
+
+- `inference_total{outcome}`: inferências por resultado (`success`, `rejected` ou `error`).
+- `inference_stage_duration_seconds{stage}`: tempo de decode, de inferência e total.
+- `inference_detections`: detecções por imagem.
+- `http_requests_total` e `http_request_duration_seconds`: por método, rota e status.
+- `model_loaded`: 1 quando o modelo está carregado.
 
 ## CI
 
@@ -168,13 +209,10 @@ O workflow em `.github/workflows/ci.yml` roda os testes automatizados e o build 
 
 ## Roadmap
 
-1. Retenção automática de uploads e resultados.
-2. Parâmetros de inferência configuráveis (confiança, IoU, tamanho, device).
-3. Logs estruturados com `execution_id` e métricas Prometheus.
-4. Interface web para upload e visualização.
-5. Fluxo de feedback para dataset.
-6. Evolução para detecção de anomalias.
-7. Coleta e organização automática de imagens.
+1. Interface web para upload e visualização.
+2. Fluxo de feedback para dataset.
+3. Evolução para detecção de anomalias.
+4. Coleta e organização automática de imagens.
 
 ## Licença
 

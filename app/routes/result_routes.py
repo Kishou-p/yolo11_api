@@ -42,7 +42,11 @@ def get_annotated_image(
 
     return FileResponse(
         path=annotated_image_path,
-        media_type="image/png",
+        media_type=(
+            "image/jpeg"
+            if annotated_image_path.suffix == ".jpg"
+            else "image/png"
+        ),
         filename=annotated_image_path.name,
     )
 

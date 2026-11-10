@@ -14,7 +14,12 @@ from app.exceptions.app_exceptions import (
     ModelInferenceError,
     ModelLoadError,
 )
-from app.schemas.inference_schema import BoundingBox, DetectionResponse
+from app.schemas.inference_schema import (
+    BoundingBox,
+    DetectionResponse,
+    InferenceParams,
+    ModelInfo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +29,22 @@ class YoloService:
         self,
         model_path: Path,
         expected_sha256: str | None = None,
+        params: InferenceParams | None = None,
     ) -> None:
         self._model_path = model_path
         self._expected_sha256 = (
             expected_sha256.strip().lower() if expected_sha256 else None
         )
+        self._params = params or InferenceParams()
+        self._loaded_sha256: str | None = None
+
+    @property
+    def params(self) -> InferenceParams:
+        return self._params
+
+    @property
+    def model_info(self) -> ModelInfo:
+        return ModelInfo(name=self._model_path.name, sha256=self._loaded_sha256)
 
     @property
     def model_path(self) -> Path:
@@ -48,12 +64,26 @@ class YoloService:
         image: NDArray[np.uint8],
     ) -> list[DetectionResponse]:
         try:
-            results = model.predict(source=image, verbose=False)
+            results = model.predict(
+                source=image,
+                verbose=False,
+                **self._predict_kwargs(),
+            )
         except (RuntimeError, OSError, ValueError, TypeError) as exc:
             logger.exception("Failed to run YOLO inference.")
             raise ModelInferenceError() from exc
 
         return self._parse_prediction_results(results)
+
+    def _predict_kwargs(self) -> dict[str, Any]:
+        kwargs = self._params.model_dump(exclude_none=True)
+
+        # Recent Ultralytics versions warn that `half` is deprecated, so
+        # only send it when half precision was actually requested.
+        if not kwargs.get("half"):
+            kwargs.pop("half", None)
+
+        return kwargs
 
     def _ensure_model_file_exists(self) -> None:
         if not self.model_exists():
@@ -63,13 +93,16 @@ class YoloService:
     def _verify_checksum(self) -> None:
         # .pt files are pickles: loading a tampered file runs arbitrary code,
         # so the hash is checked before the file reaches torch.
+        actual_sha256 = _sha256_file(self._model_path)
+        self._loaded_sha256 = actual_sha256
+
         if self._expected_sha256 is None:
             logger.warning(
-                "YOLO_MODEL_SHA256 is not set; model integrity is not checked."
+                "YOLO_MODEL_SHA256 is not set; model integrity is not checked "
+                "(current sha256: %s).",
+                actual_sha256,
             )
             return
-
-        actual_sha256 = _sha256_file(self._model_path)
 
         if not hmac.compare_digest(actual_sha256, self._expected_sha256):
             logger.error(
@@ -78,6 +111,7 @@ class YoloService:
                 self._expected_sha256,
                 actual_sha256,
             )
+            self._loaded_sha256 = None
             raise ModelChecksumMismatchError(self._model_path)
 
     def _build_model(self) -> Any:

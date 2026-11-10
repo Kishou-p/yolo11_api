@@ -3,6 +3,7 @@ from typing import Annotated, cast
 
 from fastapi import Depends, Header, Request
 from app.core.config import Settings
+from app.core.metrics import Metrics
 from app.services.health_service import HealthService
 from app.services.inference_service import InferenceService
 from app.services.result_service import ResultService
@@ -13,6 +14,10 @@ from app.exceptions.app_exceptions import UnauthorizedApiKeyError
 
 def get_settings(request: Request) -> Settings:
     return cast(Settings, request.app.state.settings)
+
+def get_metrics(request: Request) -> Metrics:
+    return cast(Metrics, request.app.state.metrics)
+
 
 def validate_api_key(
     settings: Annotated[Settings, Depends(get_settings)],
@@ -56,6 +61,7 @@ def get_storage_service(
     return StorageService(
         upload_dir=settings.upload_dir,
         output_dir=settings.output_dir,
+        annotated_format=settings.annotated_image_format,
     )
 
 
@@ -75,6 +81,8 @@ def get_inference_service(
         storage_service=storage_service,
         max_image_size_mb=settings.max_image_size_mb,
         max_image_pixels=settings.max_image_pixels,
+        save_uploads=settings.save_uploads,
+        save_annotated=settings.save_annotated,
         api_prefix=settings.api_prefix,
     )
 

@@ -14,7 +14,11 @@ from pytest import MonkeyPatch
 from app.core.config import Settings
 from app.exceptions.app_exceptions import ModelInferenceError, StorageWriteError
 from app.main import create_app
-from app.schemas.inference_schema import DetectionResponse
+from app.schemas.inference_schema import (
+    DetectionResponse,
+    InferenceParams,
+    ModelInfo,
+)
 from app.services.inference_service import InferenceService
 from app.services.model_registry_service import ModelRegistryService
 from app.services.result_service import ResultService
@@ -148,6 +152,9 @@ def test_failed_result_write_removes_partial_files(
     monkeypatch.setattr(StorageService, "save_inference_result", failing_save)
 
     class FakeRegistry:
+        model_info = ModelInfo(name="model.pt")
+        params = InferenceParams()
+
         def run_inference(self, image: Any) -> list[DetectionResponse]:
             return []
 

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -15,10 +17,34 @@ class DetectionResponse(BaseModel):
     box: BoundingBox
 
 
+class InferenceParams(BaseModel):
+    conf: float = 0.25
+    iou: float = 0.7
+    imgsz: int = 640
+    max_det: int = 300
+    device: str | None = None
+    half: bool = False
+
+
+class ModelInfo(BaseModel):
+    name: str
+    sha256: str | None = None
+
+
+class InferenceTimings(BaseModel):
+    decode_ms: float
+    inference_ms: float
+    total_ms: float
+
+
 class InferenceResponse(BaseModel):
     execution_id: str
     filename: str
     result_url: str
-    annotated_image_url: str
+    annotated_image_url: str | None
     detections_count: int
     detections: list[DetectionResponse]
+    created_at: datetime | None = None
+    model: ModelInfo | None = None
+    params: InferenceParams | None = None
+    timings: InferenceTimings | None = None

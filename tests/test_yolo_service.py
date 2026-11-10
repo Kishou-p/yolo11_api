@@ -12,6 +12,7 @@ from app.exceptions.app_exceptions import (
     ModelInferenceError,
 )
 from app.services import yolo_service
+from app.schemas.inference_schema import InferenceParams, ModelInfo
 from app.services.yolo_service import YoloService
 
 
@@ -118,10 +119,12 @@ class FakePredictModel:
         self._results = results
         self.predict_calls = 0
         self.last_source: Any | None = None
+        self.last_kwargs: dict[str, Any] = {}
 
-    def predict(self, source: Any, verbose: bool) -> list[Any]:
+    def predict(self, source: Any, verbose: bool, **kwargs: Any) -> list[Any]:
         self.predict_calls += 1
         self.last_source = source
+        self.last_kwargs = kwargs
         return self._results
 
 
@@ -196,3 +199,35 @@ def test_load_model_accepts_matching_checksum(
     service.load_model()
 
     assert fake_yolo.received_path == str(model_path)
+
+
+def test_predict_passes_configured_inference_params() -> None:
+    params = InferenceParams(conf=0.5, iou=0.4, imgsz=320, max_det=10)
+    service = YoloService(model_path=Path("fake_model.pt"), params=params)
+    model = FakePredictModel(results=[])
+
+    service.predict(model=model, image=np.zeros((10, 10, 3), dtype=np.uint8))
+
+    assert model.last_kwargs == {
+        "conf": 0.5,
+        "iou": 0.4,
+        "imgsz": 320,
+        "max_det": 10,
+    }
+
+
+def test_model_info_reports_sha256_after_load(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    model_path = tmp_path / "model.pt"
+    model_path.write_bytes(b"model-bytes")
+    monkeypatch.setattr(yolo_service, "YOLO", FakeYoloFactory())
+    service = YoloService(model_path=model_path)
+
+    service.load_model()
+
+    assert service.model_info == ModelInfo(
+        name="model.pt",
+        sha256=hashlib.sha256(b"model-bytes").hexdigest(),
+    )

@@ -16,6 +16,8 @@ from app.utils.image_utils import get_image_extension, save_image_to_file
 
 logger = logging.getLogger(__name__)
 
+ANNOTATED_EXTENSIONS = (".png", ".jpg")
+
 
 def _safe_mtime(path: Path) -> float:
     # A file may be deleted between glob() and stat(); sort it last.
@@ -30,9 +32,11 @@ class StorageService:
         self,
         upload_dir: Path,
         output_dir: Path,
+        annotated_format: str = "png",
     ) -> None:
         self._upload_dir = upload_dir
         self._output_dir = output_dir
+        self._annotated_extension = f".{annotated_format}"
 
         ensure_directory_exists(self._upload_dir)
         ensure_directory_exists(self._output_dir)
@@ -69,7 +73,20 @@ class StorageService:
         return self._output_dir / f"{execution_id}.json"
 
     def build_annotated_path(self, execution_id: str) -> Path:
-        return self._output_dir / f"{execution_id}_annotated.png"
+        return (
+            self._output_dir
+            / f"{execution_id}_annotated{self._annotated_extension}"
+        )
+
+    def find_annotated_path(self, execution_id: str) -> Path | None:
+        # Results saved before ANNOTATED_IMAGE_FORMAT changed keep their
+        # original extension, so look for any of them.
+        for extension in (self._annotated_extension, *ANNOTATED_EXTENSIONS):
+            path = self._output_dir / f"{execution_id}_annotated{extension}"
+            if path.exists():
+                return path
+
+        return None
 
     def list_result_paths(self) -> list[Path]:
         return sorted(
@@ -91,7 +108,7 @@ class StorageService:
     def delete_execution_files(self, execution_id: str) -> None:
         paths = [
             self.build_result_path(execution_id),
-            self.build_annotated_path(execution_id),
+            *self.find_annotated_paths(execution_id),
             *self.find_upload_paths(execution_id),
         ]
 
@@ -100,6 +117,9 @@ class StorageService:
                 self.delete_file_if_exists(path)
             except StorageDeleteError:
                 logger.exception("Failed to delete %s", path)
+
+    def find_annotated_paths(self, execution_id: str) -> list[Path]:
+        return list(self._output_dir.glob(f"{execution_id}_annotated.*"))
 
     def save_inference_result(
         self,
