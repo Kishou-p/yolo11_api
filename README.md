@@ -1,6 +1,26 @@
 # YOLO11 API
 
+![Python](https://img.shields.io/badge/Python-3.12-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-REST%20API-green)
+![Docker](https://img.shields.io/badge/Docker-ready-blue)
+![CI](https://img.shields.io/badge/CI-GitHub%20Actions-brightgreen)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+
 API REST em **FastAPI** para carregamento, gerenciamento e inferência com modelos YOLO11, com arquitetura em camadas, validação de uploads, persistência interna de resultados e proteção das rotas sensíveis por API Key.
+
+## Visão geral
+
+```text
+Imagem enviada
+    ↓
+API valida o upload (tipo, assinatura, tamanho e resolução)
+    ↓
+Modelo YOLO11 executa a inferência
+    ↓
+API salva o upload, o JSON de resultado e a imagem anotada
+    ↓
+API retorna execution_id, result_url e annotated_image_url
+```
 
 ## Funcionalidades
 
@@ -31,6 +51,8 @@ data/
 
 tests/             # Testes automatizados
 ```
+
+Regra principal do projeto: `ultralytics` só deve ser importado em `app/services/yolo_service.py`. As rotas não importam YOLO diretamente, não fazem regra de negócio pesada e não acessam caminhos internos.
 
 ## Endpoints
 
@@ -81,6 +103,40 @@ pytest
 uvicorn app.main:create_app --factory --reload
 ```
 
+## Demo rápida (PowerShell)
+
+Com a API rodando, o modelo já é carregado na inicialização:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/v1/health/ready
+
+$headers = @{ "X-API-Key" = "<sua API_KEY>" }
+
+curl.exe -X POST "http://127.0.0.1:8000/api/v1/inference/image" `
+  -H "X-API-Key: <sua API_KEY>" `
+  -F "file=@C:\caminho\para\imagem.png"
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/results/<execution_id>" -Headers $headers
+
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/v1/results/<execution_id>/image" `
+  -Headers $headers -OutFile ".\annotated_result.png"
+```
+
+Exemplo de resposta da inferência:
+
+```json
+{
+  "execution_id": "1a3468eee54747699873d461cf15db31",
+  "filename": "image.png",
+  "result_url": "/api/v1/results/1a3468eee54747699873d461cf15db31",
+  "annotated_image_url": "/api/v1/results/1a3468eee54747699873d461cf15db31/image",
+  "detections_count": 0,
+  "detections": []
+}
+```
+
+No `.env`, evite aspas em valores simples (`API_KEY=abc`, não `API_KEY="abc"`), porque o Docker as mantém no valor.
+
 ## Docker
 
 ```bash
@@ -105,3 +161,21 @@ e adicione a reserva de GPU (`deploy.resources.reservations.devices`) no `docker
 - Mantenha a API em uma rede segmentada, acessível só pelos sistemas que precisam dela.
 - Para trocar o modelo: copie o novo arquivo para `data/models/`, atualize `YOLO_MODEL_SHA256` e reinicie o container.
 - Os arquivos em `data/uploads` e `data/outputs` não são removidos automaticamente; defina uma rotina de retenção conforme a necessidade de rastreabilidade.
+
+## CI
+
+O workflow em `.github/workflows/ci.yml` roda os testes automatizados e o build da imagem Docker a cada push na `main` e em cada pull request.
+
+## Roadmap
+
+1. Retenção automática de uploads e resultados.
+2. Parâmetros de inferência configuráveis (confiança, IoU, tamanho, device).
+3. Logs estruturados com `execution_id` e métricas Prometheus.
+4. Interface web para upload e visualização.
+5. Fluxo de feedback para dataset.
+6. Evolução para detecção de anomalias.
+7. Coleta e organização automática de imagens.
+
+## Licença
+
+Este projeto está licenciado sob a licença MIT.
