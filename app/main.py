@@ -14,11 +14,14 @@ from app.core.metrics import Metrics
 from app.core.request_context import RequestContextMiddleware
 from app.exceptions.app_exceptions import AppError
 from app.exceptions.exception_handlers import register_exception_handlers
+from app.routes.demo_routes import page_router as demo_page_router
+from app.routes.demo_routes import router as demo_router
 from app.routes.health_routes import router as health_router
 from app.routes.inference_routes import router as inference_router
 from app.routes.metrics_routes import router as metrics_router
 from app.routes.model_routes import router as model_router
 from app.routes.result_routes import router as result_router
+from app.services.demo_service import DemoService
 from app.services.model_registry_service import ModelRegistryService
 from app.services.retention_service import RetentionService
 from app.services.yolo_service import YoloService
@@ -53,6 +56,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ),
     )
 
+    if app_settings.demo_enabled:
+        app.state.demo_service = DemoService(
+            demo_dir=app_settings.demo_dir,
+            classes=app_settings.demo_classes,
+            base_model_path=app_settings.yolo_model_path,
+            base_model_sha256=app_settings.yolo_model_sha256,
+            params=app_settings.inference_params,
+            train_epochs=app_settings.demo_train_epochs,
+            train_imgsz=app_settings.demo_train_imgsz,
+            train_batch=app_settings.demo_train_batch,
+            min_images=app_settings.demo_min_images,
+            max_image_size_mb=app_settings.max_image_size_mb,
+            max_image_pixels=app_settings.max_image_pixels,
+        )
+
     _register_middlewares(app, app_settings)
     _register_routes(app, app_settings)
     register_exception_handlers(app)
@@ -67,6 +85,9 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     ensure_directory_exists(settings.upload_dir)
     ensure_directory_exists(settings.output_dir)
+    if settings.demo_enabled:
+        ensure_directory_exists(settings.demo_dir)
+        app.state.demo_service.ensure_directories()
 
     if settings.load_model_on_startup:
         await run_in_threadpool(_load_and_warmup_model, model_registry)
@@ -162,6 +183,10 @@ def _register_routes(app: FastAPI, settings: Settings) -> None:
         prefix=settings.api_prefix,
         tags=["results"],
     )
+
+    if settings.demo_enabled:
+        app.include_router(demo_page_router, tags=["demo"])
+        app.include_router(demo_router, prefix=settings.api_prefix, tags=["demo"])
 
     if settings.metrics_enabled:
         app.include_router(metrics_router, tags=["metrics"])

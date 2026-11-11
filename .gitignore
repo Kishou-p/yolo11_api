@@ -28,11 +28,13 @@ Thumbs.db
 # Runtime artifacts
 data/uploads/*
 data/outputs/*
+data/demo/*
 annotated_*.png
 
 # Keep folder structure
 !data/uploads/.gitkeep
 !data/outputs/.gitkeep
+!data/demo/.gitkeep
 
 # Logs
 *.log

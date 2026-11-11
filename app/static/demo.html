@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Inspeção de peças</title>
+<style>
+:root {
+  --bg: #f1f5f9; --card: #ffffff; --text: #0f172a; --muted: #64748b;
+  --line: #e2e8f0; --accent: #2563eb; --accent-text: #ffffff;
+  --ok: #16a34a; --ok-soft: #dcfce7; --bad: #dc2626; --bad-soft: #fee2e2;
+  --none-soft: #e2e8f0; --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1120; --card: #111a2e; --text: #e2e8f0; --muted: #94a3b8;
+    --line: #1e293b; --accent: #3b82f6; --ok-soft: #052e16; --bad-soft: #450a0a;
+    --none-soft: #1e293b;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { padding-bottom: env(safe-area-inset-bottom); }
+header { position: sticky; top: 0; z-index: 5; background: #0f172a; color: #fff;
+  padding: 12px 16px calc(0px) 16px; }
+header .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+header h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+header small { color: #94a3b8; font-size: 12px; }
+.icon-btn { background: transparent; border: 0; color: #cbd5e1; font-size: 20px; padding: 6px; cursor: pointer; }
+nav { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 10px; }
+nav button { background: transparent; color: #94a3b8; border: 0; padding: 10px 4px 12px;
+  font: inherit; font-size: 15px; font-weight: 600; border-bottom: 3px solid transparent; cursor: pointer; }
+nav button.active { color: #fff; border-bottom-color: var(--accent); }
+nav button .n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%;
+  background: #1e293b; font-size: 12px; margin-right: 6px; }
+nav button.active .n { background: var(--accent); }
+main { max-width: 720px; margin: 0 auto; padding: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 14px; }
+.card h2 { font-size: 16px; margin: 0 0 6px; }
+.muted { color: var(--muted); font-size: 14px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+  border-radius: 12px; padding: 12px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  min-height: 48px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.danger { color: var(--bad); }
+.btn.big { width: 100%; font-size: 17px; min-height: 56px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hidden { display: none !important; }
+input[type=file] { display: none; }
+input[type=password], input[type=text], select { width: 100%; padding: 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
+.classes { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin: 10px 0; }
+.cls { border: 2px solid var(--line); background: var(--card); color: var(--text); border-radius: 12px;
+  padding: 10px; font: inherit; font-weight: 650; cursor: pointer; min-height: 48px; }
+.cls .dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.cls.active { border-color: currentColor; }
+.stage { position: relative; border-radius: 12px; overflow: hidden; background: #000; }
+.stage canvas { display: block; width: 100%; height: auto; touch-action: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; color: #fff; }
+.chip button { background: rgba(0,0,0,.25); border: 0; color: #fff; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; }
+.stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.stat { flex: 1 1 90px; background: var(--bg); border-radius: 10px; padding: 8px 10px; }
+.stat b { display: block; font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 12px; }
+.thumb { position: relative; border-radius: 10px; overflow: hidden; background: var(--bg); aspect-ratio: 1; }
+.thumb canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb button { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%;
+  border: 0; background: rgba(15,23,42,.7); color: #fff; cursor: pointer; }
+.progress { height: 12px; background: var(--bg); border-radius: 999px; overflow: hidden; margin: 12px 0 6px; }
+.progress div { height: 100%; width: 0; background: var(--accent); transition: width .4s; }
+.verdict { border-radius: var(--radius); padding: 18px; text-align: center; margin-bottom: 12px; }
+.verdict .big { font-size: 28px; font-weight: 800; letter-spacing: .5px; }
+.verdict.ok { background: var(--ok-soft); color: var(--ok); }
+.verdict.defeito { background: var(--bad-soft); color: var(--bad); }
+.verdict.nada { background: var(--none-soft); color: var(--muted); }
+.toast { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
+  max-width: 560px; margin: 0 auto; background: #0f172a; color: #fff; padding: 12px 14px; border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.3); z-index: 20; font-size: 15px; }
+.toast.err { background: var(--bad); }
+.steps { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 14px; }
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.row-actions .btn { flex: 1 1 auto; }
+.spinner { width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.4); border-top-color: #fff;
+  border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div>
+      <h1>Inspeção de peças</h1>
+      <small>YOLO11 · treino e detecção no navegador</small>
+    </div>
+    <button class="icon-btn" id="keyBtn" title="Chave da API" aria-label="Chave da API">⚙︎</button>
+  </div>
+  <nav>
+    <button data-tab="teach" class="active"><span class="n">1</span>Ensinar</button>
+    <button data-tab="train"><span class="n">2</span>Treinar</button>
+    <button data-tab="test"><span class="n">3</span>Testar</button>
+  </nav>
+</header>
+
+<main>
+  <!-- API key -->
+  <section id="keyCard" class="card hidden">
+    <h2>Chave de acesso</h2>
+    <p class="muted">Digite a API_KEY do arquivo .env do servidor. Ela fica salva só neste aparelho.</p>
+    <input id="keyInput" type="password" autocomplete="off" placeholder="API_KEY">
+    <div class="row-actions"><button class="btn primary" id="keySave">Salvar</button></div>
+  </section>
+
+  <!-- 1. Teach -->
+  <section data-panel="teach">
+    <div class="card" id="captureCard">
+      <h2>Tire fotos de peças completas e com falta</h2>
+      <ol class="steps">
+        <li>Tire a foto.</li>
+        <li>Com <b>Peça</b> selecionado, arraste o dedo para desenhar um quadrado em volta da peça.</li>
+        <li>Se faltar algo, escolha <b>Falta aqui</b> e desenhe um quadrado no lugar vazio.</li>
+        <li>Salve. Quanto mais fotos, melhor: 10 ou mais completas e 10 ou mais com falta.</li>
+      </ol>
+      <div class="grid2" style="margin-top:12px">
+        <button class="btn primary big" data-pick="teachCam">📷 Tirar foto</button>
+        <button class="btn big" data-pick="teachGal">🖼️ Galeria</button>
+      </div>
+      <input type="file" id="teachCam" accept="image/*" capture="environment">
+      <input type="file" id="teachGal" accept="image/*" multiple>
+    </div>
+
+    <div class="card hidden" id="editorCard">
+      <h2>Marque a peça</h2>
+      <div class="classes" id="classButtons"></div>
+      <div class="stage"><canvas id="editor"></canvas></div>
+      <div class="chips" id="boxChips"></div>
+      <p class="muted" id="editorHint">Arraste o dedo sobre a foto para desenhar o quadrado em volta da peça.</p>
+      <div class="row-actions">
+        <button class="btn" id="undoBtn">↶ Desfazer</button>
+        <button class="btn danger" id="discardBtn">Descartar</button>
+        <button class="btn primary" id="saveBtn">Salvar foto</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row-actions" style="margin:0;justify-content:space-between;align-items:center">
+        <h2 style="margin:0">Fotos ensinadas</h2>
+        <button class="btn danger" id="clearBtn" style="flex:0 0 auto;min-height:38px;padding:6px 12px;font-size:14px">Apagar tudo</button>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="gallery" id="gallery"></div>
+      <p class="muted hidden" id="emptyGallery">Nenhuma foto ainda.</p>
+    </div>
+  </section>
+
+  <!-- 2. Train -->
+  <section data-panel="train" class="hidden">
+    <div class="card">
+      <h2>Treinar a IA</h2>
+      <p class="muted">O modelo YOLO11n aprende com as suas fotos. Roda na CPU: com 20 a 40 fotos leva de 1 a 5 minutos.</p>
+      <div class="stats" id="trainStats"></div>
+      <label class="muted" for="epochs" style="display:block;margin:14px 0 6px">Intensidade do treino</label>
+      <select id="epochs">
+        <option value="15">Rápido (15 épocas)</option>
+        <option value="30" selected>Normal (30 épocas)</option>
+        <option value="60">Caprichado (60 épocas)</option>
+      </select>
+      <div class="row-actions">
+        <button class="btn primary big" id="trainBtn">🧠 Treinar agora</button>
+      </div>
+      <div id="trainProgress" class="hidden">
+        <div class="progress"><div id="bar"></div></div>
+        <div class="row-actions" style="justify-content:space-between;align-items:center;margin-top:0">
+          <span id="trainMsg" class="muted"></span>
+          <button class="btn danger" id="stopBtn" style="flex:0 0 auto;min-height:38px;padding:6px 12px;font-size:14px">Parar</button>
+        </div>
+      </div>
+    </div>
+    <div class="card hidden" id="modelCard">
+      <h2>✅ Modelo pronto</h2>
+      <p class="muted" id="modelInfo"></p>
+      <div class="row-actions">
+        <button class="btn primary" data-goto="test">Testar agora →</button>
+        <button class="btn" id="downloadBtn">⬇︎ Baixar modelo</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Test -->
+  <section data-panel="test" class="hidden">
+    <div class="card">
+      <h2>Testar uma peça nova</h2>
+      <p class="muted">Tire uma foto que a IA ainda não viu. Ela acha a peça e diz se está completa ou com parte faltando, e onde.</p>
+      <div class="grid2" style="margin-top:12px">
+        <button class="btn primary big" data-pick="testCam">📷 Tirar foto</button>
+        <button class="btn big" data-pick="testGal">🖼️ Galeria</button>
+      </div>
+      <input type="file" id="testCam" accept="image/*" capture="environment">
+      <input type="file" id="testGal" accept="image/*">
+    </div>
+    <div class="card hidden" id="resultCard">
+      <div class="verdict" id="verdict"><div class="big" id="verdictText"></div><div id="verdictSub"></div></div>
+      <div class="stage"><canvas id="resultCanvas"></canvas></div>
+      <p class="muted" id="resultInfo" style="margin-bottom:0"></p>
+    </div>
+    <div class="card">
+      <h2>E no Raspberry Pi?</h2>
+      <p class="muted" style="margin:0">É o mesmo modelo (YOLO11n, poucos MB) e a mesma API. No Raspberry Pi 5 a detecção leva algumas centenas de milissegundos por foto na CPU, e menos exportando para NCNN. O tempo medido aqui aparece em cada resultado.</p>
+    </div>
+  </section>
+</main>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+(() => {
+  const API = "/api/v1/demo";
+  const MAX_SIDE = 1280;
+  const COLORS = ["#16a34a", "#dc2626", "#f59e0b", "#2563eb", "#9333ea", "#0891b2"];
+  const LABELS = { peca: "Peça", falta: "Falta aqui" };
+  const $ = (id) => document.getElementById(id);
+
+  const state = { classes: [], current: 0, boxes: [], image: null, blob: null, queue: [], drawing: null, pollTimer: null, lastState: null };
+
+  // ---------- helpers
+  const label = (name) => LABELS[name] || name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  const color = (id) => COLORS[id % COLORS.length];
+  function getKey() { try { return localStorage.getItem("demoApiKey") || ""; } catch { return ""; } }
+  function setKey(v) { try { localStorage.setItem("demoApiKey", v); } catch {} }
+
+  let toastTimer;
+  function toast(msg, err = false) {
+    const el = $("toast");
+    el.textContent = msg; el.className = "toast" + (err ? " err" : "");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.add("hidden"), 3500);
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(API + path, { ...opts, headers: { "X-API-Key": getKey(), ...(opts.headers || {}) } });
+    if (res.status === 401) { showKey(true); throw new Error("Chave de acesso inválida."); }
+    if (!res.ok) {
+      let msg = "Erro " + res.status;
+      try { const j = await res.json(); if (typeof j.detail === "string") msg = j.detail; } catch {}
+      throw new Error(msg);
+    }
+    return res;
+  }
+
+  function showKey(show) {
+    $("keyCard").classList.toggle("hidden", !show);
+    if (show) { $("keyInput").value = getKey(); $("keyInput").focus(); }
+  }
+
+  // Load a photo, apply EXIF rotation and shrink it, so uploads stay small.
+  async function loadPhoto(file) {
+    let source;
+    try { source = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+    catch {
+      source = await new Promise((ok, fail) => {
+        const img = new Image(); img.onload = () => ok(img); img.onerror = () => fail(new Error("Não consegui abrir a foto."));
+        img.src = URL.createObjectURL(file);
+      });
+    }
+    const w0 = source.width, h0 = source.height;
+    const scale = Math.min(1, MAX_SIDE / Math.max(w0, h0));
+    const c = document.createElement("canvas");
+    c.width = Math.round(w0 * scale); c.height = Math.round(h0 * scale);
+    c.getContext("2d").drawImage(source, 0, 0, c.width, c.height);
+    const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.9));
+    return { canvas: c, blob };
+  }
+
+  function drawBoxes(ctx, boxes, w, h, withLabels) {
+    const lw = Math.max(3, Math.round(Math.max(w, h) / 250));
+    const fs = Math.max(14, Math.round(Math.max(w, h) / 38));
+    ctx.font = `700 ${fs}px system-ui, sans-serif`;
+    for (const b of boxes) {
+      const c = color(b.class_id);
+      ctx.strokeStyle = c; ctx.lineWidth = lw;
+      ctx.strokeRect(b.x * w, b.y * h, b.w * w, b.h * h);
+      ctx.fillStyle = c + "22"; ctx.fillRect(b.x * w, b.y * h, b.w * w, b.h * h);
+      if (withLabels) {
+        const text = label(state.classes[b.class_id] || b.class_name || "") + (b.confidence != null ? ` ${Math.round(b.confidence * 100)}%` : "");
+        const tw = ctx.measureText(text).width + fs * 0.6;
+        const ty = Math.max(0, b.y * h - fs * 1.4);
+        ctx.fillStyle = c; ctx.fillRect(b.x * w - lw / 2, ty, tw, fs * 1.4);
+        ctx.fillStyle = "#fff"; ctx.fillText(text, b.x * w + fs * 0.3 - lw / 2, ty + fs * 1.05);
+      }
+    }
+  }
+
+  // ---------- tabs
+  function goTab(tab) {
+    document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+    document.querySelectorAll("[data-panel]").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== tab));
+    if (tab === "train") refreshTrain();
+    if (tab !== "teach") refreshDataset(false);
+    window.scrollTo({ top: 0 });
+  }
+  document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => goTab(b.dataset.tab)));
+  document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => goTab(b.dataset.goto)));
+  document.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => $(b.dataset.pick).click()));
+
+  // ---------- 1. teach
+  function renderClassButtons() {
+    const wrap = $("classButtons"); wrap.innerHTML = "";
+    state.classes.forEach((name, i) => {
+      const b = document.createElement("button");
+      b.className = "cls" + (i === state.current ? " active" : "");
+      b.style.color = i === state.current ? color(i) : "";
+      b.innerHTML = `<span class="dot" style="background:${color(i)}"></span>`;
+      b.append(label(name));
+      b.addEventListener("click", () => { state.current = i; renderClassButtons(); });
+      wrap.append(b);
+    });
+  }
+
+  function renderEditor() {
+    const cv = $("editor"), img = state.image;
+    cv.width = img.width; cv.height = img.height;
+    const ctx = cv.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    const boxes = state.drawing ? [...state.boxes, state.drawing] : state.boxes;
+    drawBoxes(ctx, boxes, cv.width, cv.height, false);
+    const chips = $("boxChips"); chips.innerHTML = "";
+    state.boxes.forEach((b, i) => {
+      const chip = document.createElement("span");
+      chip.className = "chip"; chip.style.background = color(b.class_id);
+      chip.append(label(state.classes[b.class_id]));
+      const x = document.createElement("button"); x.textContent = "✕"; x.setAttribute("aria-label", "Remover");
+      x.addEventListener("click", () => { state.boxes.splice(i, 1); renderEditor(); });
+      chip.append(x); chips.append(chip);
+    });
+    $("saveBtn").textContent = state.boxes.length ? `Salvar foto (${state.boxes.length})` : "Salvar foto";
+    $("editorHint").classList.toggle("hidden", state.boxes.length > 0);
+  }
+
+  function pointer(e) {
+    const cv = $("editor"), r = cv.getBoundingClientRect();
+    return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
+  }
+  const editor = $("editor");
+  let start = null;
+  editor.addEventListener("pointerdown", (e) => { start = pointer(e); editor.setPointerCapture(e.pointerId); e.preventDefault(); });
+  editor.addEventListener("pointermove", (e) => {
+    if (!start) return;
+    const p = pointer(e);
+    state.drawing = { class_id: state.current, x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+    renderEditor();
+  });
+  const endDraw = () => {
+    if (state.drawing && state.drawing.w > 0.02 && state.drawing.h > 0.02) state.boxes.push(state.drawing);
+    state.drawing = null; start = null; renderEditor();
+  };
+  editor.addEventListener("pointerup", endDraw);
+  editor.addEventListener("pointercancel", endDraw);
+
+  async function openNextPhoto() {
+    const file = state.queue.shift();
+    if (!file) { $("editorCard").classList.add("hidden"); $("captureCard").classList.remove("hidden"); return; }
+    try {
+      const { canvas, blob } = await loadPhoto(file);
+      state.image = canvas; state.blob = blob; state.boxes = []; state.current = 0;
+      $("captureCard").classList.add("hidden");
+      $("editorCard").classList.remove("hidden");
+      renderClassButtons(); renderEditor();
+      $("editorCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) { toast(err.message, true); openNextPhoto(); }
+  }
+  for (const id of ["teachCam", "teachGal"]) {
+    $(id).addEventListener("change", (e) => { state.queue.push(...e.target.files); e.target.value = ""; openNextPhoto(); });
+  }
+  $("undoBtn").addEventListener("click", () => { state.boxes.pop(); renderEditor(); });
+  $("discardBtn").addEventListener("click", () => openNextPhoto());
+  $("saveBtn").addEventListener("click", async () => {
+    if (!state.boxes.length && !confirm("Salvar sem nenhum quadrado? A foto conta como \"sem peça\".")) return;
+    const btn = $("saveBtn"); btn.disabled = true;
+    try {
+      const form = new FormData();
+      form.append("file", state.blob, "foto.jpg");
+      form.append("boxes", JSON.stringify(state.boxes.map(({ class_id, x, y, w, h }) => ({ class_id, x, y, w, h }))));
+      await api("/dataset", { method: "POST", body: form });
+      toast("Foto salva ✔");
+      await refreshDataset(true);
+      openNextPhoto();
+    } catch (err) { toast(err.message, true); }
+    finally { btn.disabled = false; }
+  });
+
+  function renderStats(el, counts) {
+    el.innerHTML = "";
+    const items = [["imagens", "fotos"], ...state.classes.map((n) => [n, label(n)])];
+    for (const [key, text] of items) {
+      const d = document.createElement("div"); d.className = "stat";
+      d.innerHTML = `<b>${counts[key] || 0}</b><span></span>`; d.querySelector("span").textContent = text;
+      el.append(d);
+    }
+  }
+
+  const thumbCache = new Map();
+  async function thumb(item) {
+    const div = document.createElement("div"); div.className = "thumb";
+    const cv = document.createElement("canvas"); div.append(cv);
+    const del = document.createElement("button"); del.textContent = "✕"; del.setAttribute("aria-label", "Apagar foto");
+    del.addEventListener("click", async () => {
+      if (!confirm("Apagar esta foto?")) return;
+      try { await api(`/dataset/${item.image_id}`, { method: "DELETE" }); thumbCache.delete(item.image_id); refreshDataset(true); }
+      catch (err) { toast(err.message, true); }
+    });
+    div.append(del);
+    (async () => {
+      let bmp = thumbCache.get(item.image_id);
+      if (!bmp) {
+        const res = await api(`/dataset/${item.image_id}/image`);
+        bmp = await createImageBitmap(await res.blob());
+        thumbCache.set(item.image_id, bmp);
+      }
+      const s = 240 / Math.max(bmp.width, bmp.height);
+      cv.width = Math.round(bmp.width * s); cv.height = Math.round(bmp.height * s);
+      const ctx = cv.getContext("2d"); ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+      drawBoxes(ctx, item.boxes, cv.width, cv.height, false);
+    })().catch(() => {});
+    return div;
+  }
+
+  async function refreshDataset(withGallery = true) {
+    try {
+      const data = await (await api("/dataset")).json();
+      state.classes = data.classes;
+      renderStats($("stats"), data.counts);
+      renderStats($("trainStats"), data.counts);
+      state.counts = data.counts;
+      if (withGallery) {
+        const g = $("gallery"); g.innerHTML = "";
+        for (const item of data.images) g.append(await thumb(item));
+        $("emptyGallery").classList.toggle("hidden", data.images.length > 0);
+      }
+    } catch (err) { toast(err.message, true); }
+  }
+  $("clearBtn").addEventListener("click", async () => {
+    if (!confirm("Apagar TODAS as fotos ensinadas?")) return;
+    try { await api("/dataset", { method: "DELETE" }); thumbCache.clear(); refreshDataset(true); toast("Fotos apagadas"); }
+    catch (err) { toast(err.message, true); }
+  });
+
+  // ---------- 2. train
+  function renderTrain(s) {
+    const running = s.state === "running" || s.state === "stopping";
+    $("trainBtn").disabled = running;
+    $("trainBtn").innerHTML = running ? '<span class="spinner"></span> Treinando...' : (s.trained ? "🧠 Treinar de novo" : "🧠 Treinar agora");
+    $("trainProgress").classList.toggle("hidden", !running && s.state !== "error" && s.state !== "done");
+    $("stopBtn").classList.toggle("hidden", !running);
+    const pct = s.epochs ? Math.round((s.epoch / s.epochs) * 100) : 0;
+    $("bar").style.width = (s.state === "done" ? 100 : pct) + "%";
+    let msg = s.message || "";
+    if (s.map50 != null && running) msg += ` · acerto (mAP50) ${Math.round(s.map50 * 100)}%`;
+    $("trainMsg").textContent = msg;
+    $("trainMsg").style.color = s.state === "error" ? "var(--bad)" : "";
+    $("modelCard").classList.toggle("hidden", !s.trained || running);
+    if (s.trained) {
+      const when = s.trained_at ? new Date(s.trained_at).toLocaleString("pt-BR") : "";
+      const acc = s.map50 != null ? ` Acerto nas fotos de treino (mAP50): ${Math.round(s.map50 * 100)}%.` : "";
+      $("modelInfo").textContent = `Treinado com ${s.trained_images ?? "?"} fotos em ${when}. Tamanho: ${s.model_size_mb} MB.${acc}`;
+    }
+    if (state.lastState === "running" && s.state === "done") toast("Treino concluído! Vá para Testar.");
+    state.lastState = s.state;
+    clearTimeout(state.pollTimer);
+    if (running) state.pollTimer = setTimeout(refreshTrain, 1500);
+  }
+  async function refreshTrain() {
+    try { renderTrain(await (await api("/train")).json()); } catch (err) { toast(err.message, true); }
+  }
+  $("trainBtn").addEventListener("click", async () => {
+    try {
+      const res = await api("/train", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ epochs: Number($("epochs").value) }) });
+      renderTrain(await res.json());
+    } catch (err) { toast(err.message, true); }
+  });
+  $("stopBtn").addEventListener("click", async () => {
+    try { renderTrain(await (await api("/train/stop", { method: "POST" })).json()); } catch (err) { toast(err.message, true); }
+  });
+  $("downloadBtn").addEventListener("click", async () => {
+    try {
+      const blob = await (await api("/model")).blob();
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "demo_best.pt"; a.click();
+    } catch (err) { toast(err.message, true); }
+  });
+
+  // ---------- 3. test
+  const VERDICTS = {
+    ok: ["✅ PEÇA BOA", "Nenhuma falta encontrada"],
+    defeito: ["❌ PARTE FALTANDO", "A peça foi reprovada: veja o quadrado vermelho"],
+    nada: ["Nenhuma peça encontrada", "Tente aproximar ou melhorar a luz"],
+  };
+  async function runTest(file) {
+    const card = $("resultCard");
+    try {
+      const { canvas, blob } = await loadPhoto(file);
+      card.classList.remove("hidden");
+      $("verdict").className = "verdict nada";
+      $("verdictText").textContent = "Analisando..."; $("verdictSub").textContent = "";
+      const out = $("resultCanvas"); out.width = canvas.width; out.height = canvas.height;
+      out.getContext("2d").drawImage(canvas, 0, 0);
+      $("resultInfo").textContent = "";
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+      const form = new FormData(); form.append("file", blob, "teste.jpg");
+      const t0 = performance.now();
+      const r = await (await api("/predict", { method: "POST", body: form })).json();
+      const total = Math.round(performance.now() - t0);
+      const [text, sub] = VERDICTS[r.verdict];
+      $("verdict").className = "verdict " + r.verdict;
+      $("verdictText").textContent = text; $("verdictSub").textContent = sub;
+      const ctx = out.getContext("2d"); ctx.drawImage(canvas, 0, 0);
+      drawBoxes(ctx, r.detections, out.width, out.height, true);
+      $("resultInfo").textContent = `IA: ${Math.round(r.inference_ms)} ms · total com envio: ${total} ms · ${r.detections.length} detecção(ões)`;
+    } catch (err) {
+      $("verdict").className = "verdict nada"; $("verdictText").textContent = "Não deu certo"; $("verdictSub").textContent = err.message;
+    }
+  }
+  for (const id of ["testCam", "testGal"]) {
+    $(id).addEventListener("change", (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) runTest(f); });
+  }
+
+  // ---------- key + init
+  $("keyBtn").addEventListener("click", () => showKey($("keyCard").classList.contains("hidden")));
+  $("keySave").addEventListener("click", () => { setKey($("keyInput").value.trim()); showKey(false); init(); });
+  $("keyInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("keySave").click(); });
+
+  async function init() {
+    // A key in the link (…/demo#key=XYZ) is saved and removed from the address bar.
+    const m = location.hash.match(/key=([^&]+)/);
+    if (m) { setKey(decodeURIComponent(m[1])); history.replaceState(null, "", location.pathname); }
+    if (!getKey()) { showKey(true); return; }
+    await refreshDataset(true);
+    refreshTrain();
+  }
+  init();
+})();
+</script>
+</body>
+</html>

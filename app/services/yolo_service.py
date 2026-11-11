@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import logging
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -13,6 +14,7 @@ from app.exceptions.app_exceptions import (
     ModelFileNotFoundError,
     ModelInferenceError,
     ModelLoadError,
+    ModelTrainingError,
 )
 from app.schemas.inference_schema import (
     BoundingBox,
@@ -75,6 +77,65 @@ class YoloService:
 
         return self._parse_prediction_results(results)
 
+    def train(
+        self,
+        model: Any,
+        *,
+        data_yaml: Path,
+        output_dir: Path,
+        epochs: int,
+        imgsz: int,
+        batch: int,
+        on_epoch_end: Callable[[int, int, dict[str, float]], bool] | None = None,
+    ) -> Path:
+        """Fine-tune `model` on a YOLO dataset and return the best weights.
+
+        `on_epoch_end(epoch, epochs, metrics)` is called after each epoch;
+        returning True stops training early (the best weights so far are
+        kept). Settings favour small datasets on CPU: no worker processes
+        (Docker's /dev/shm is tiny), no plots and no AMP check download.
+        """
+
+        def _callback(trainer: Any) -> None:
+            if on_epoch_end is None:
+                return
+            metrics = {
+                str(key): float(value)
+                for key, value in (getattr(trainer, "metrics", None) or {}).items()
+                if isinstance(value, (int, float))
+            }
+            if on_epoch_end(int(trainer.epoch) + 1, int(trainer.epochs), metrics):
+                trainer.stop = True
+
+        model.add_callback("on_fit_epoch_end", _callback)
+
+        try:
+            model.train(
+                data=str(data_yaml),
+                epochs=epochs,
+                imgsz=imgsz,
+                batch=batch,
+                device=self._params.device,
+                workers=0,
+                project=str(output_dir),
+                name="train",
+                exist_ok=True,
+                plots=False,
+                amp=False,
+                cache=False,
+                patience=max(epochs, 50),
+                verbose=False,
+            )
+        except Exception as exc:
+            logger.exception("YOLO training failed.")
+            raise ModelTrainingError() from exc
+
+        best = Path(str(getattr(model.trainer, "best", "")))
+        if not best.is_file():
+            raise ModelTrainingError()
+
+        return best
+
     def _predict_kwargs(self) -> dict[str, Any]:
         kwargs = self._params.model_dump(exclude_none=True)
 
@@ -93,7 +154,7 @@ class YoloService:
     def _verify_checksum(self) -> None:
         # .pt files are pickles: loading a tampered file runs arbitrary code,
         # so the hash is checked before the file reaches torch.
-        actual_sha256 = _sha256_file(self._model_path)
+        actual_sha256 = sha256_file(self._model_path)
         self._loaded_sha256 = actual_sha256
 
         if self._expected_sha256 is None:
@@ -164,7 +225,7 @@ class YoloService:
 
         return float(x1), float(y1), float(x2), float(y2)
 
-def _sha256_file(file_path: Path) -> str:
+def sha256_file(file_path: Path) -> str:
     digest = hashlib.sha256()
 
     with file_path.open("rb") as model_file:

@@ -10,6 +10,7 @@ tests/
 
 data/uploads/
 data/outputs/
+data/demo/
 runs/
 
 *.onnx
