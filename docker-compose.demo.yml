@@ -1,0 +1,10 @@
+# Demo na rede local: abre a porta 8080 para o celular acessar /demo.
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build
+# Depois, no celular (mesmo Wi-Fi): http://<IP-do-computador>:8080/demo
+# Use só em rede confiável: o tráfego é HTTP sem TLS.
+services:
+  yolo11-api:
+    ports:
+      - "8080:8000"
+    # Treinar usa mais CPU e memória do que só inferir.
+    mem_limit: 6g

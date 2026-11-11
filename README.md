@@ -154,6 +154,39 @@ Exemplo de resposta da inferência:
 
 No `.env`, evite aspas em valores simples (`API_KEY=abc`, não `API_KEY="abc"`), porque o Docker as mantém no valor.
 
+## Demo no celular: ensinar, treinar e testar
+
+Uma página web em `/demo` mostra o fluxo inteiro de inspeção de peças, sem instalar nada no celular:
+
+1. **Ensinar**: tire fotos de peças completas e de peças com parte faltando. Com o dedo, desenhe um quadrado em volta da peça ("Peça") e, quando faltar algo, outro quadrado no lugar vazio ("Falta aqui").
+2. **Treinar**: um toque faz o fine-tune do YOLO11n com essas fotos, na CPU, com barra de progresso. Com 20 a 40 fotos leva poucos minutos.
+3. **Testar**: tire uma foto nova e a página mostra **PEÇA BOA** ou **PARTE FALTANDO**, com os quadrados e o tempo da IA em milissegundos.
+
+Subir na rede local com Docker (Windows, PowerShell):
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build
+ipconfig   # anote o "Endereço IPv4" do Wi-Fi, ex.: 192.168.0.15
+```
+
+No celular, no mesmo Wi-Fi, abra `http://192.168.0.15:8080/demo#key=<sua API_KEY>`. A chave fica salva no celular e some da barra de endereço. Na primeira vez o Windows pode perguntar sobre o firewall: permita em redes privadas.
+
+Sem Docker: `uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8080`.
+
+Dicas para a demo:
+
+- 10 a 20 fotos de cada tipo, com o mesmo fundo e boa luz, já bastam para impressionar. Varie a posição e o ângulo da peça.
+- Teste com fotos que a IA não viu no treino.
+- Marque o **lugar** da falta, não só a peça inteira como "ruim". Com poucas fotos, a IA não aprende que um parafuso a menos muda a peça toda; já um furo vazio ela aprende rápido. Num teste com 24 fotos sintéticas (placa com 4 parafusos), marcar a peça inteira como boa/ruim acertou 1 de 8 fotos novas mesmo com 80 épocas; marcar o lugar da falta acertou 8 de 8 com 30 épocas.
+- A câmera abre pelo próprio seletor de arquivos do celular, então funciona em HTTP simples, sem certificado.
+- O conjunto de fotos serve de treino e de validação ao mesmo tempo: o "acerto" mostrado é otimista. Para medir de verdade, use fotos separadas.
+
+O que fica em `data/demo/`: as fotos (`images/`), os rótulos no formato YOLO (`labels/`), a saída do último treino (`runs/`) e o modelo treinado (`model/best.pt`), que pode ser baixado pela página. As classes vêm de `DEMO_CLASSES`: a primeira é a peça e as outras marcam defeitos. Se a IA achar algum defeito, a peça é reprovada.
+
+**Raspberry Pi**: é a mesma API e o mesmo modelo (YOLO11n, ~5 MB). Num Raspberry Pi 5 (64 bits) rode a API com `pip install -r requirements.txt` e copie `data/demo/model/best.pt`. Para ficar mais rápido, exporte para NCNN: `yolo export model=best.pt format=ncnn imgsz=512`. O ideal é treinar no PC e levar só o modelo para o Pi.
+
+Rotas da demo (todas com `X-API-Key`, prefixo `/api/v1/demo`): `GET/POST/DELETE /dataset`, `GET /dataset/{id}/image`, `DELETE /dataset/{id}`, `POST /train`, `GET /train`, `POST /train/stop`, `POST /predict`, `GET /model`. Desligue tudo com `DEMO_ENABLED=false`.
+
 ## Docker
 
 ```bash

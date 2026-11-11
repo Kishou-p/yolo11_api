@@ -48,6 +48,17 @@ class Settings(BaseSettings):
     retention_days: int = Field(default=0, ge=0)
     retention_interval_minutes: int = Field(default=60, ge=1)
 
+    # Demo web app (/demo): label photos, fine-tune and test in the browser.
+    demo_enabled: bool = True
+    demo_dir: Path = Path("data/demo")
+    # The first class is the part itself; every other class marks a defect
+    # (e.g. the spot where a component is missing).
+    demo_classes: list[str] = ["peca", "falta"]
+    demo_train_epochs: int = Field(default=30, ge=1, le=300)
+    demo_train_imgsz: int = Field(default=512, ge=128, le=1280)
+    demo_train_batch: int = Field(default=8, ge=1, le=64)
+    demo_min_images: int = Field(default=4, ge=1)
+
     api_key: SecretStr = SecretStr("dev-secret-key")
     extra_api_keys: list[SecretStr] = []
 
@@ -91,6 +102,16 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    @field_validator("demo_classes")
+    @classmethod
+    def _validate_demo_classes(cls, value: list[str]) -> list[str]:
+        names = [name.strip() for name in value]
+        if len(names) < 2 or any(not name for name in names):
+            raise ValueError("DEMO_CLASSES needs at least two non-empty names.")
+        if len(set(names)) != len(names):
+            raise ValueError("DEMO_CLASSES must not repeat names.")
+        return names
 
     @model_validator(mode="after")
     def _validate_api_keys(self) -> "Settings":

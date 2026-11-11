@@ -50,6 +50,18 @@ class ModelNotLoadedError(AppError):
         )
 
 
+class ModelTrainingError(AppError):
+    def __init__(self) -> None:
+        super().__init__(message="Model training failed.", status_code=500)
+
+
+class DemoError(AppError):
+    """Errors from the demo flow, with a message safe to show the user."""
+
+    def __init__(self, message: str, status_code: int = 400) -> None:
+        super().__init__(message=message, status_code=status_code)
+
+
 class UnsupportedImageTypeError(AppError):
     def __init__(self, content_type: str | None) -> None:
         message = f"Unsupported image type: {_truncate(content_type)}"

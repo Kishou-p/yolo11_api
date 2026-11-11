@@ -13,6 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     YOLO_CONFIG_DIR=/tmp/ultralytics \
+    MPLCONFIGDIR=/tmp/matplotlib \
     OPENCV_IO_MAX_IMAGE_PIXELS=40000000
 
 # ultralytics pulls in opencv-python, which needs these libraries.
@@ -29,7 +30,7 @@ COPY requirements.txt .
 RUN python -m pip install -r requirements.txt
 
 RUN useradd --system --uid 10001 --no-create-home app \
-    && mkdir -p /app/data/models /app/data/uploads /app/data/outputs \
+    && mkdir -p /app/data/models /app/data/uploads /app/data/outputs /app/data/demo \
     && chown -R app:app /app/data
 
 COPY app ./app
