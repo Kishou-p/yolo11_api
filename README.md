@@ -181,7 +181,7 @@ Dicas para a demo:
 - A câmera abre pelo próprio seletor de arquivos do celular, então funciona em HTTP simples, sem certificado.
 - O conjunto de fotos serve de treino e de validação ao mesmo tempo: o "acerto" mostrado é otimista. Para medir de verdade, use fotos separadas.
 
-O que fica em `data/demo/`: as fotos (`images/`), os rótulos no formato YOLO (`labels/`), a saída do último treino (`runs/`) e o modelo treinado (`model/best.pt`), que pode ser baixado pela página. As classes vêm de `DEMO_CLASSES`: a primeira é a peça e as outras marcam defeitos. Se a IA achar algum defeito, a peça é reprovada.
+O que fica em `data/demo/`: as fotos (`images/`), os rótulos no formato YOLO (`labels/`), a saída do último treino (`runs/`) e o modelo treinado (`model/best.pt`), que pode ser baixado pela página. As classes vêm de `DEMO_CLASSES`: a primeira é a peça e as outras marcam defeitos. Se a IA achar algum defeito, a peça é reprovada. Como cada foto tem uma peça só, a demo fica com a peça mais provável e as faltas dentro dela (`DEMO_SINGLE_PART=true`). Para fotos com várias peças, use `false`.
 
 **Raspberry Pi**: é a mesma API e o mesmo modelo (YOLO11n, ~5 MB). Num Raspberry Pi 5 (64 bits) rode a API com `pip install -r requirements.txt` e copie `data/demo/model/best.pt`. Para ficar mais rápido, exporte para NCNN: `yolo export model=best.pt format=ncnn imgsz=512`. O ideal é treinar no PC e levar só o modelo para o Pi.
 

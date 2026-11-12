@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     demo_train_imgsz: int = Field(default=512, ge=128, le=1280)
     demo_train_batch: int = Field(default=8, ge=1, le=64)
     demo_min_images: int = Field(default=4, ge=1)
+    # Each photo shows one part: keep only the most confident part box and
+    # the defects inside it.
+    demo_single_part: bool = True
 
     api_key: SecretStr = SecretStr("dev-secret-key")
     extra_api_keys: list[SecretStr] = []

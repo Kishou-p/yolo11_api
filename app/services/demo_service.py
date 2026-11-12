@@ -71,6 +71,7 @@ class DemoService:
         min_images: int,
         max_image_size_mb: int,
         max_image_pixels: int,
+        single_part: bool = True,
     ) -> None:
         self._dir = demo_dir
         self._classes = classes
@@ -84,6 +85,7 @@ class DemoService:
         self._min_images = min_images
         self._max_image_size_mb = max_image_size_mb
         self._max_image_pixels = max_image_pixels
+        self._single_part = single_part
 
         self._status_lock = threading.Lock()
         self._status = DemoTrainStatus(state="idle")
@@ -398,6 +400,9 @@ class DemoService:
                 )
             )
 
+        if self._single_part:
+            results = _keep_single_part(results)
+
         if any(not item.good for item in results):
             verdict = "defeito"
         elif results:
@@ -475,6 +480,30 @@ class DemoService:
     def _check_image_id(image_id: str) -> None:
         if not IMAGE_ID_PATTERN.match(image_id):
             raise DemoError("Foto não encontrada.", status_code=404)
+
+
+def _keep_single_part(detections: list[DemoDetection]) -> list[DemoDetection]:
+    """Keep the most confident part and the defects inside it.
+
+    Each photo shows one part, so extra part boxes are background or
+    duplicates. Defects outside the chosen part are dropped too, so a
+    false "missing" on the background does not fail a good part.
+    """
+    parts = [item for item in detections if item.good]
+    defects = [item for item in detections if not item.good]
+
+    if not parts:
+        # No part found: the best defect alone still flags the photo.
+        return sorted(defects, key=lambda item: item.confidence, reverse=True)[:1]
+
+    part = max(parts, key=lambda item: item.confidence)
+    inside = [
+        item
+        for item in defects
+        if part.x <= item.x + item.w / 2 <= part.x + part.w
+        and part.y <= item.y + item.h / 2 <= part.y + part.h
+    ]
+    return [part, *inside]
 
 
 def _labels_to_text(boxes: list[DemoBox]) -> str:
