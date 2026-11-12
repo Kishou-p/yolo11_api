@@ -11,7 +11,8 @@ from pytest import MonkeyPatch
 from app.core.config import Settings
 from app.main import create_app
 from app.schemas.inference_schema import BoundingBox, DetectionResponse
-from app.services.demo_service import DemoService
+from app.schemas.demo_schema import DemoDetection
+from app.services.demo_service import DemoService, _keep_single_part
 from app.services.yolo_service import YoloService
 
 AUTH = {"X-API-Key": "dev-secret-key"}
@@ -214,3 +215,30 @@ def test_training_failure_is_reported(tmp_path: Path, monkeypatch: MonkeyPatch) 
         status = client.get("/api/v1/demo/train", headers=AUTH).json()
         assert status["state"] == "error"
         assert status["trained"] is False
+
+
+def _det(class_id: int, conf: float, x: float, y: float, w: float, h: float) -> DemoDetection:
+    return DemoDetection(
+        class_id=class_id,
+        class_name="peca" if class_id == 0 else "falta",
+        confidence=conf,
+        good=class_id == 0,
+        x=x,
+        y=y,
+        w=w,
+        h=h,
+    )
+
+
+def test_single_part_keeps_best_part_and_its_defects() -> None:
+    best = _det(0, 0.9, 0.1, 0.1, 0.4, 0.4)
+    other = _det(0, 0.5, 0.6, 0.6, 0.3, 0.3)
+    inside = _det(1, 0.4, 0.2, 0.2, 0.1, 0.1)
+    outside = _det(1, 0.8, 0.7, 0.7, 0.1, 0.1)
+
+    assert _keep_single_part([other, outside, best, inside]) == [best, inside]
+    # A defect found only on the background does not fail a good part.
+    assert _keep_single_part([best, outside]) == [best]
+    # Without any part, the most confident defect still flags the photo.
+    assert _keep_single_part([inside, outside]) == [outside]
+    assert _keep_single_part([]) == []

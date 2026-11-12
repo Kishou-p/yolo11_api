@@ -69,6 +69,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             min_images=app_settings.demo_min_images,
             max_image_size_mb=app_settings.max_image_size_mb,
             max_image_pixels=app_settings.max_image_pixels,
+            single_part=app_settings.demo_single_part,
         )
 
     _register_middlewares(app, app_settings)
